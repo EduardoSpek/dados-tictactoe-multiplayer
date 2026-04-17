@@ -71,4 +71,6 @@ MIT License - sinta-se livre para usar e modificar!
 
 ---
 
-Desenvolvido com ❤️ por [Seu Nome]
+Desenvolvido com ❤️ por **Eduardo Spek**
+
+[![Instagram](https://img.shields.io/badge/Instagram-%40eduardospek-E4405F?style=flat-square&logo=instagram&logoColor=white)](https://www.instagram.com/eduardospek)
