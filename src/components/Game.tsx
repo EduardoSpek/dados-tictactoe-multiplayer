@@ -277,6 +277,26 @@ export default function Game() {
           <li>4. Faça 3 em linha para vencer!</li>
         </ul>
       </div>
+
+      {/* Credits */}
+      <div className="text-center mt-6 pb-4">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Desenvolvido com ❤️ por <span className="font-semibold text-gray-800 dark:text-gray-200">Eduardo Spek</span>
+        </p>
+        <a 
+          href="https://www.instagram.com/eduardospek" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-sm text-pink-600 hover:text-pink-700 dark:text-pink-400 dark:hover:text-pink-300 transition-colors mt-1"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect width="20" height="20" x="2" y="2" rx="5" ry="5"/>
+            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+            <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
+          </svg>
+          @eduardospek
+        </a>
+      </div>
     </div>
   )
 }
