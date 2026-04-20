@@ -1,76 +1,166 @@
-# 🎲 Jogo da Velha com Dados
+# 🎲 Dados Tic-Tac-Toe Multiplayer
 
-Um jogo da velha estratégico com mecânica de dados, desenvolvido com Next.js, TypeScript e Tailwind CSS.
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![Socket.io](https://img.shields.io/badge/Socket.io-4.8-white?style=flat-square&logo=socket.io)](https://socket.io/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
 
-![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat-square&logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.0-38B2AC?style=flat-square&logo=tailwind-css)
+> **Jogo da Velha com Dados - Versão Multiplayer Online**
 
-## 🎮 Como Jogar
+Um jogo da velha inovador com mecânicas de dados, dois tabuleiros simultâneos e sistema de "roubo" de casas. Jogue online com amigos em tempo real!
 
-1. **Role o dado** clicando nele para sortear um número de 1 a 6
-2. **Números 1, 2, 3** → marque no **tabuleiro esquerdo** (colunas correspondentes)
-3. **Números 4, 5, 6** → marque no **tabuleiro direito** (colunas correspondentes)
-4. Se a coluna sorteada estiver **cheia**, a vez passa automaticamente para o outro jogador
-5. Faça **3 em linha** (horizontal, vertical ou diagonal) para vencer!
+![Game Preview](https://img.shields.io/badge/🎮-Jogue%20Agora-brightgreen?style=for-the-badge)
+
+---
 
 ## ✨ Funcionalidades
 
-- 🎲 Dois tabuleiros 3x3 com mecânica de dados
-- 🌙 Tema claro/escuro com persistência
-- 📱 Design responsivo para mobile e desktop
-- 🏆 Placar persistente no LocalStorage
-- ⚡ Animações suaves no dado
-- 🔄 Reinício de jogo e zeramento de placar
+### 🎯 Mecânicas do Jogo
+- **🎲 Sistema de Dados**: Role um dado (0-6) para determinar em qual coluna jogar
+- **🔥 Modo Roubo**: Ao tirar **0**, entre no modo roubo e capture casas do adversário!
+- **🎭 Dois Tabuleiros**: Tabuleiros 1-3 e 4-6 com colunas interconectadas
+- **🏆 Placar de Vitórias**: Acompanhe seu desempenho contra oponentes
+- **🔄 Reconexão Automática**: Volte ao jogo mesmo se atualizar a página
 
-## 🛠️ Tecnologias
+### 🌐 Multiplayer Online
+- **Crie Salas**: Gere códigos de sala para convidar amigos
+- **Entre por Código**: Conecte-se a salas existentes facilmente
+- **Tempo Real**: Comunicação instantânea via WebSocket
+- **Suporte a Rede Local**: Jogue na mesma rede WiFi
 
-- **Next.js 14** - Framework React com App Router
-- **TypeScript** - Tipagem estática
-- **Tailwind CSS** - Estilização utilitária
-- **Lucide React** - Ícones modernos
+### 🎨 Interface
+- **🌙 Modo Escuro**: Interface elegante com tema dark
+- **📱 Responsivo**: Funciona em desktop, tablet e mobile
+- **🔊 Efeitos Sonoros**: Sons imersivos para cada ação
+- **⚡ Animações Suaves**: Transições fluidas e modernas
 
-## 🚀 Instalação
+---
+
+## 🚀 Como Executar
+
+### Pré-requisitos
+- Node.js 20+
+- npm ou yarn
+
+### Instalação
 
 ```bash
 # Clone o repositório
-git clone https://github.com/seu-usuario/dados-tictactoe.git
-cd dados-tictactoe
+git clone https://github.com/EduardoSpek/dados-tictactoe-multiplayer.git
+
+# Entre na pasta
+cd dados-tictactoe-multiplayer
 
 # Instale as dependências
 npm install
 
-# Execute em modo desenvolvimento
+# Inicie o servidor de desenvolvimento
 npm run dev
-
-# Acesse http://localhost:3001
 ```
 
-## 📦 Build para Produção
+O servidor estará disponível em `http://localhost:3001`
 
-```bash
-npm run build
-npm start
-```
+### 🌐 Jogar na Rede Local
 
-## 🎯 Regras do Jogo
+Para jogar com amigos na mesma rede:
 
-- Dois jogadores alternam turnos (X e O)
-- Cada turno começa rolando o dado
-- O número sorteado determina em qual coluna o jogador deve marcar
-- Se a coluna estiver completamente preenchida, o jogador perde a vez
-- Vitória: 3 símbolos iguais em linha (horizontal, vertical ou diagonal) em qualquer tabuleiro
+1. Descubra seu IP local:
+   ```bash
+   # Linux/Mac
+   ip addr show
+   
+   # Windows
+   ipconfig
+   ```
 
-## 📱 Screenshots
+2. Compartilhe o endereço: `http://SEU_IP:3001`
 
-*Adicione screenshots do jogo aqui*
-
-## 📝 Licença
-
-MIT License - sinta-se livre para usar e modificar!
+3. Seus amigos acessam pelo navegador e jogam em tempo real!
 
 ---
 
-Desenvolvido com ❤️ por **Eduardo Spek**
+## 🎮 Como Jogar
 
-[![Instagram](https://img.shields.io/badge/Instagram-%40eduardospek-E4405F?style=flat-square&logo=instagram&logoColor=white)](https://www.instagram.com/eduardospek)
+### Criar uma Sala
+1. Acesse a página inicial
+2. Digite seu nome
+3. Clique em "Criar Sala"
+4. Compartilhe o código da sala com seu amigo
+
+### Entrar em uma Sala
+1. Digite seu nome
+2. Cole o código da sala
+3. Clique em "Entrar na Sala"
+
+### Regras do Jogo
+1. **Role o dado** para sortear uma coluna (1-6)
+2. **Marque** em uma das casas da coluna sorteada
+3. **Tire 0** para ativar o modo roubo e capturar casas do adversário
+4. **Alinhe 3** em qualquer tabuleiro para vencer!
+
+---
+
+## 🛠️ Tecnologias
+
+- **[Next.js](https://nextjs.org/)** - Framework React com App Router
+- **[Socket.io](https://socket.io/)** - Comunicação em tempo real
+- **[TypeScript](https://www.typescriptlang.org/)** - Tipagem estática
+- **[Tailwind CSS](https://tailwindcss.com/)** - Estilização utilitária
+- **[Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)** - Efeitos sonoros
+
+---
+
+## 📁 Estrutura do Projeto
+
+```
+dados-tictactoe-multiplayer/
+├── server.js              # Servidor Socket.io
+├── src/
+│   ├── app/
+│   │   ├── game/          # Página do jogo multiplayer
+│   │   ├── lobby/         # Página de criação/entrada de salas
+│   │   ├── offline/       # Modo offline (vs IA)
+│   │   └── api/socket/    # Configuração do Socket.io
+│   ├── components/        # Componentes React
+│   └── hooks/
+│       └── useSocket.ts   # Hook de conexão WebSocket
+├── public/               # Assets estáticos
+└── package.json
+```
+
+---
+
+## 📝 Notas
+
+- **⚠️ Não suporta Vercel**: Este projeto requer um servidor WebSocket persistente, não compatível com serverless.
+- **💾 Persistência**: O placar é mantido durante a sessão da sala.
+- **🔄 Reconexão**: Jogadores podem reconectar em até 30 segundos após desconectar.
+
+---
+
+## 🤝 Contribuição
+
+Contribuições são bem-vindas! Sinta-se à vontade para abrir issues e pull requests.
+
+---
+
+## 📜 Licença
+
+Este projeto está licenciado sob a [MIT License](LICENSE).
+
+---
+
+<div align="center">
+
+### 💜 Desenvolvido com amor por **Eduardo Spek**
+
+[![Instagram](https://img.shields.io/badge/Instagram-%40eduardospek-E4405F?style=for-the-badge&logo=instagram&logoColor=white)](https://www.instagram.com/eduardospek)
+[![GitHub](https://img.shields.io/badge/GitHub-EduardoSpek-181717?style=for-the-badge&logo=github)](https://github.com/EduardoSpek)
+
+</div>
+
+---
+
+<p align="center">
+  <strong>🎲 Divirta-se jogando! 🎮</strong>
+</p>
