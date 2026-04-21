@@ -23,6 +23,7 @@ Um jogo da velha inovador com mecânicas de dados, dois tabuleiros simultâneos 
 - **🏆 Placar de Vitórias**: Acompanhe seu desempenho contra oponentes
 - **🔄 Reconexão Automática**: Volte ao jogo mesmo se atualizar a página
 - **✨ Indicador de Vez**: Borda glow amarela pulsante quando é sua vez de jogar
+- **😀 Reações com Emoji**: Comunique-se com oponente usando emojis (feliz, triste, raiva, risada, descolado)
 
 ### 🌐 Multiplayer Online
 - **Crie Salas**: Gere códigos de sala para convidar amigos
@@ -35,6 +36,7 @@ Um jogo da velha inovador com mecânicas de dados, dois tabuleiros simultâneos 
 - **📱 Responsivo**: Funciona em desktop, tablet e mobile
 - **🔊 Efeitos Sonoros**: Sons imersivos para cada ação (dado, roubo, limpar, vitória)
 - **✨ Indicador Visual de Vez**: Borda glow pulsante quando é sua vez
+- **😀 Reações com Emoji**: Botão de reações ao lado do dado para interagir com oponente
 - **⚡ Animações Suaves**: Transições fluidas e modernas
 
 ---
@@ -100,7 +102,8 @@ Para jogar com amigos na mesma rede:
 2. **Marque** em uma das casas da coluna sorteada
 3. **Tire 0** para ativar o modo roubo e capturar casas do adversário
 4. **Tire 7** para ativar o modo limpar e zerar um tabuleiro completo
-5. **Alinhe 3** em qualquer tabuleiro para vencer!
+5. **Use emojis** para se comunicar com seu oponente durante a partida
+6. **Alinhe 3** em qualquer tabuleiro para vencer!
 
 ---
 
