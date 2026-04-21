@@ -675,6 +675,26 @@ app.prepare().then(() => {
         }
       })
     })
+
+    // Handle emoji reactions
+    socket.on('send-reaction', (data) => {
+      const { roomId, emoji } = data
+      const game = games.get(roomId.toUpperCase())
+      if (!game) return
+      
+      const player = Array.from(game.players.values()).find(p => p.socketId === socket.id)
+      if (!player) return
+      
+      console.log(`[REACTION] ${player.name} sent ${emoji} in room ${roomId}`)
+      
+      // Broadcast reaction to all players in room
+      io.to(roomId.toUpperCase()).emit('reaction-received', {
+        emoji,
+        playerName: player.name,
+        playerSymbol: player.symbol,
+        timestamp: Date.now(),
+      })
+    })
   })
 
   httpServer

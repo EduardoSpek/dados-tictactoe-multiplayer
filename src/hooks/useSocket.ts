@@ -309,6 +309,19 @@ export function useSocket() {
       setError(null) // Clear error when opponent reconnects
     })
 
+    // Listen for reactions
+    socket.on('reaction-received', (data: {
+      emoji: string
+      playerName: string
+      playerSymbol: 'X' | 'O'
+      timestamp: number
+    }) => {
+      // Dispatch custom event for ReactionButton component
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('game-reaction', { detail: data }))
+      }
+    })
+
     return () => {
       socket.disconnect()
     }
@@ -380,6 +393,11 @@ export function useSocket() {
     })
   }, [])
 
+  const sendReaction = useCallback((emoji: string) => {
+    if (!socketRef.current || !roomId) return
+    socketRef.current.emit('send-reaction', { roomId, emoji })
+  }, [roomId])
+
   return {
     isConnected,
     roomId,
@@ -395,5 +413,6 @@ export function useSocket() {
     cellClick,
     clearBoard,
     resetGame,
+    sendReaction,
   }
 }

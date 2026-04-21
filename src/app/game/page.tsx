@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useSocket } from '@/hooks/useSocket'
 import useSound from '@/hooks/useSound'
 import Board from '@/components/Board'
 import Dice from '@/components/Dice'
+import ReactionButton from '@/components/ReactionButton'
 import confetti from 'canvas-confetti'
 
 export default function GamePage() {
@@ -20,6 +21,7 @@ export default function GamePage() {
     cellClick,
     clearBoard,
     resetGame,
+    sendReaction,
     isConnected,
     joinRoom,
     joinAsCreator,
@@ -31,6 +33,39 @@ export default function GamePage() {
   const [mounted, setMounted] = useState(false)
   const [joined, setJoined] = useState(false)
   const [playerName, setPlayerName] = useState('')
+  const [floatingReactions, setFloatingReactions] = useState<{id: number, emoji: string, playerName: string, playerSymbol: 'X' | 'O'}[]>([])
+
+  // Handle reactions from other players
+  useEffect(() => {
+    const handleReaction = (event: CustomEvent) => {
+      const { emoji, playerName, playerSymbol } = event.detail
+      const id = Date.now() + Math.random()
+      setFloatingReactions(prev => [...prev, { id, emoji, playerName, playerSymbol }])
+      
+      // Remove after animation
+      setTimeout(() => {
+        setFloatingReactions(prev => prev.filter(r => r.id !== id))
+      }, 3000)
+    }
+
+    window.addEventListener('game-reaction', handleReaction as EventListener)
+    return () => window.removeEventListener('game-reaction', handleReaction as EventListener)
+  }, [])
+
+  const handleSendReaction = useCallback((emoji: string) => {
+    sendReaction(emoji)
+    // Also show own reaction locally
+    const id = Date.now() + Math.random()
+    setFloatingReactions(prev => [...prev, { 
+      id, 
+      emoji, 
+      playerName: playerName || 'Você', 
+      playerSymbol: playerSymbol || 'X' 
+    }])
+    setTimeout(() => {
+      setFloatingReactions(prev => prev.filter(r => r.id !== id))
+    }, 3000)
+  }, [sendReaction, playerName, playerSymbol])
 
   useEffect(() => {
     setMounted(true)
@@ -177,12 +212,34 @@ export default function GamePage() {
   }
 
   const isMyTurn = playerSymbol === gameState.currentPlayer
-  const canRoll = isMyTurn && !gameState.isRolling && !gameState.winner && !gameState.allowedColumn && !gameState.stealMode
+  const canRoll = isMyTurn && !gameState.isRolling && !gameState.winner && !gameState.allowedColumn && !gameState.stealMode && !gameState.clearMode
   const leftBoardActive = gameState.allowedColumn !== null && gameState.allowedColumn <= 2
   const rightBoardActive = gameState.allowedColumn !== null && gameState.allowedColumn >= 3
 
   return (
-    <div className="min-h-screen p-2 md:p-6 lg:p-8 bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen p-2 md:p-6 lg:p-8 bg-gray-50 dark:bg-gray-900 relative">
+      {/* Floating Reactions */}
+      <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+        {floatingReactions.map((reaction) => (
+          <div
+            key={reaction.id}
+            className="absolute bottom-32 left-1/2 transform -translate-x-1/2"
+            style={{
+              animation: 'floatUp 3s ease-out forwards',
+            }}
+          >
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-full shadow-lg ${
+              reaction.playerSymbol === 'X'
+                ? 'bg-blue-500 text-white'
+                : 'bg-green-500 text-white'
+            }`}
+            >
+              <span className="text-2xl">{reaction.emoji}</span>
+              <span className="text-sm font-bold">{reaction.playerName}</span>
+            </div>
+          </div>
+        ))}
+      </div>
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-4">
@@ -388,6 +445,14 @@ export default function GamePage() {
 
         {/* Controls */}
         <div className="flex justify-center gap-3 mt-4">
+          {/* Reaction Button */}
+          {gameState.gameStarted && players.length === 2 && (
+            <ReactionButton
+              onReaction={handleSendReaction}
+              disabled={!isConnected}
+            />
+          )}
+          
           {gameState.winner && (
             <button
               type="button"
@@ -443,6 +508,28 @@ export default function GamePage() {
           </a>
         </div>
       </div>
+
+      {/* Floating Animation Styles */}
+      <style jsx>{`
+        @keyframes floatUp {
+          0% {
+            opacity: 0;
+            transform: translateX(-50%) translateY(0) scale(0.5);
+          }
+          10% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-20px) scale(1);
+          }
+          90% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-100px) scale(1);
+          }
+          100% {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-120px) scale(0.8);
+          }
+        }
+      `}</style>
     </div>
   )
 }
