@@ -374,64 +374,64 @@ export default function GamePage() {
             </div>
           </div>
 
-          {/* Dice Area */}
+          {/* Dice and Reaction Area - Side by Side */}
           {!gameState.winner ? (
-            <div className={`mt-4 p-3 rounded-xl flex flex-col items-center transition-all duration-300 ${
-              isMyTurn && !gameState.isRolling && !gameState.stealMode && !gameState.clearMode && gameState.allowedColumn === null
-                ? 'bg-gradient-to-r from-yellow-100 via-yellow-200 to-yellow-100 dark:from-yellow-900/40 dark:via-yellow-800/40 dark:to-yellow-900/40 border-4 border-yellow-500 dark:border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.6)] animate-pulse'
-                : gameState.stealMode && isMyTurn
-                ? 'bg-gradient-to-r from-purple-100 via-purple-200 to-purple-100 dark:from-purple-900/40 dark:via-purple-800/40 dark:to-purple-900/40 border-4 border-purple-500 dark:border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.6)]'
-                : gameState.clearMode && isMyTurn
-                ? 'bg-gradient-to-r from-red-100 via-red-200 to-red-100 dark:from-red-900/40 dark:via-red-800/40 dark:to-red-900/40 border-4 border-red-500 dark:border-red-400 shadow-[0_0_20px_rgba(239,68,68,0.6)]'
-                : 'bg-gray-100 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700'
-            }`}>
-              <div className="text-center mb-2">
-                <p className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">
-                  {gameState.stealMode ? (
-                    <span className="text-purple-600 dark:text-purple-400">
-                      🔥 MODO ROUBO! Clique em uma casa do adversário!
-                    </span>
-                  ) : gameState.clearMode ? (
-                    <span className="text-red-600 dark:text-red-400">
-                      🧹 MODO LIMPAR! Escolha qual tabuleiro limpar!
-                    </span>
-                  ) : (
-                    <>
-                      Vez do{' '}
-                      <span
-                        className={
-                          gameState.currentPlayer === 'X'
-                            ? 'text-blue-600 dark:text-blue-400'
-                            : 'text-green-600 dark:text-green-400'
-                        }
-                      >
-                        Jogador {gameState.currentPlayer}
+            <div className="flex items-stretch justify-center gap-3 mt-4">
+              {/* Dice Area - 80% with turn indicator border */}
+              <div className={`flex-[0.8] p-3 rounded-xl flex flex-col items-center transition-all duration-300 ${
+                isMyTurn && !gameState.isRolling && !gameState.stealMode && !gameState.clearMode && gameState.allowedColumn === null
+                  ? 'bg-gradient-to-r from-yellow-100 via-yellow-200 to-yellow-100 dark:from-yellow-900/40 dark:via-yellow-800/40 dark:to-yellow-900/40 border-4 border-yellow-500 dark:border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.6)] animate-pulse'
+                  : gameState.stealMode && isMyTurn
+                  ? 'bg-gradient-to-r from-purple-100 via-purple-200 to-purple-100 dark:from-purple-900/40 dark:via-purple-800/40 dark:to-purple-900/40 border-4 border-purple-500 dark:border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.6)]'
+                  : gameState.clearMode && isMyTurn
+                  ? 'bg-gradient-to-r from-red-100 via-red-200 to-red-100 dark:from-red-900/40 dark:via-red-800/40 dark:to-red-900/40 border-4 border-red-500 dark:border-red-400 shadow-[0_0_20px_rgba(239,68,68,0.6)]'
+                  : 'bg-gray-100 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700'
+              }`}>
+                <div className="text-center mb-2">
+                  <p className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">
+                    {gameState.stealMode ? (
+                      <span className="text-purple-600 dark:text-purple-400">
+                        🔥 MODO ROUBO! Clique em uma casa do adversário!
                       </span>
-                      {isMyTurn && ' (Você) ✅'}
-                    </>
-                  )}
-                </p>
-                {!gameState.stealMode && !gameState.clearMode && (
-                  <p className={`text-xs md:text-sm mt-1 font-bold ${
-                    isMyTurn && !gameState.isRolling && gameState.allowedColumn === null
-                      ? 'text-yellow-700 dark:text-yellow-300 animate-bounce'
-                      : 'text-gray-600 dark:text-gray-400'
-                  }`}>
-                    {gameState.isRolling
-                      ? 'Sorteando...'
-                      : gameState.allowedColumn !== null
-                      ? `Marque na coluna ${(gameState.allowedColumn % 3) + 1}`
-                      : canRoll
-                      ? '🎲 SUA VEZ! Clique no dado para sortear!'
-                      : 'Aguardando...'}
+                    ) : gameState.clearMode ? (
+                      <span className="text-red-600 dark:text-red-400">
+                        🧹 MODO LIMPAR! Escolha qual tabuleiro limpar!
+                      </span>
+                    ) : (
+                      <>
+                        Vez do{' '}
+                        <span
+                          className={
+                            gameState.currentPlayer === 'X'
+                              ? 'text-blue-600 dark:text-blue-400'
+                              : 'text-green-600 dark:text-green-400'
+                          }
+                        >
+                          Jogador {gameState.currentPlayer}
+                        </span>
+                        {isMyTurn && ' (Você) ✅'}
+                      </>
+                    )}
                   </p>
-                )}
-              </div>
+                  {!gameState.stealMode && !gameState.clearMode && (
+                    <p className={`text-xs md:text-sm mt-1 font-bold ${
+                      isMyTurn && !gameState.isRolling && gameState.allowedColumn === null
+                        ? 'text-yellow-700 dark:text-yellow-300 animate-bounce'
+                        : 'text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {gameState.isRolling
+                        ? 'Sorteando...'
+                        : gameState.allowedColumn !== null
+                        ? `Marque na coluna ${(gameState.allowedColumn % 3) + 1}`
+                        : canRoll
+                        ? '🎲 SUA VEZ! Clique no dado para sortear!'
+                        : 'Aguardando...'}
+                    </p>
+                  )}
+                </div>
 
-              {/* Dice Area - Flex container with two columns */}
-              <div className="flex items-center justify-center gap-4 w-full">
-                {/* Dice - 80% */}
-                <div className="flex-[0.8] flex flex-col items-center justify-center">
+                {/* Dice */}
+                <div className="flex flex-col items-center justify-center">
                   <Dice
                     value={gameState.diceValue}
                     size="lg"
@@ -446,18 +446,18 @@ export default function GamePage() {
                     </p>
                   </div>
                 </div>
-                
-                {/* Reaction Button - 20% */}
-                {gameState.gameStarted && players.length === 2 && (
-                  <div className="flex-[0.2] flex justify-center items-center">
-                    <ReactionButton
-                      ref={reactionButtonRef}
-                      onReaction={handleSendReaction}
-                      disabled={!isConnected}
-                    />
-                  </div>
-                )}
               </div>
+              
+              {/* Reaction Button Area - 20% */}
+              {gameState.gameStarted && players.length === 2 && (
+                <div className="flex-[0.2] flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-xl border-2 border-gray-300 dark:border-gray-700 p-2">
+                  <ReactionButton
+                    ref={reactionButtonRef}
+                    onReaction={handleSendReaction}
+                    disabled={!isConnected}
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <div className="mt-4 p-4 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl border-2 border-yellow-400 dark:border-yellow-600 text-center">
