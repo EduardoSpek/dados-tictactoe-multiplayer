@@ -431,7 +431,7 @@ export default function GamePage() {
                 </div>
 
                 {/* Dice */}
-                <div className="flex flex-col items-center justify-center">
+                <div className="flex flex-row items-center justify-center gap-4">
                   <Dice
                     value={gameState.diceValue}
                     size="lg"
@@ -439,9 +439,9 @@ export default function GamePage() {
                     onClick={canRoll ? rollDice : undefined}
                     disabled={!canRoll}
                   />
-                  {/* Dice Value Display */}
-                  <div className="text-center mt-2">
-                    <p className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
+                  {/* Dice Value Display - Ao lado direito */}
+                  <div className="text-center">
+                    <p className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
                       {gameState.diceValue}
                     </p>
                   </div>
