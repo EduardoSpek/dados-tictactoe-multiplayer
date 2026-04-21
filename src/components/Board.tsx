@@ -11,9 +11,10 @@ interface BoardProps {
   isActive: boolean
   diceStart: number
   stealMode?: boolean
+  clearMode?: boolean
 }
 
-export default function Board({ board, currentPlayer, allowedColumn, onCellClick, playerName, isActive, diceStart, stealMode = false }: BoardProps) {
+export default function Board({ board, currentPlayer, allowedColumn, onCellClick, playerName, isActive, diceStart, stealMode = false, clearMode = false }: BoardProps) {
   const getCellClasses = (row: number, col: number, value: string | null) => {
     const actualCol = diceStart === 4 ? col + 3 : col
     const opponent = currentPlayer === 'X' ? 'O' : 'X'
@@ -31,7 +32,10 @@ export default function Board({ board, currentPlayer, allowedColumn, onCellClick
       border-2
     `
     
-    if (value === 'X') {
+    if (clearMode && isActive) {
+      // Clear mode styling - entire board is clickable
+      baseClasses += ' bg-red-300 dark:bg-red-800 border-red-500 dark:border-red-400 text-red-800 dark:text-red-200 shadow-inner cursor-pointer hover:bg-red-400 dark:hover:bg-red-700 animate-pulse'
+    } else if (value === 'X') {
       if (isStealable) {
         baseClasses += ' bg-red-300 dark:bg-red-800 border-red-600 dark:border-red-400 text-red-800 dark:text-red-200 shadow-inner cursor-pointer hover:bg-red-400 dark:hover:bg-red-700 animate-pulse'
       } else {
@@ -72,7 +76,7 @@ export default function Board({ board, currentPlayer, allowedColumn, onCellClick
               key={`${rowIndex}-${colIndex}`}
               type="button"
               onClick={() => onCellClick(rowIndex, colIndex)}
-              disabled={!stealMode && (!isActive || cell !== null)}
+              disabled={!stealMode && !clearMode && (!isActive || cell !== null)}
               className={getCellClasses(rowIndex, colIndex, cell)}
             >
               {cell}

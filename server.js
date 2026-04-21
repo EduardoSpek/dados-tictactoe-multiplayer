@@ -143,6 +143,7 @@ app.prepare().then(() => {
         allowedColumn: game.allowedColumn,
         winner: game.winner,
         stealMode: game.stealMode,
+        clearMode: game.clearMode || false,
       })
       console.log(`[JOIN] Sent sync-game-state to ${data.playerName}`)
       
@@ -238,6 +239,7 @@ app.prepare().then(() => {
           allowedColumn: game.allowedColumn,
           winner: game.winner,
           stealMode: game.stealMode,
+          clearMode: game.clearMode || false,
         })
       }
       
@@ -309,6 +311,7 @@ app.prepare().then(() => {
           allowedColumn: game.allowedColumn,
           winner: game.winner,
           stealMode: game.stealMode,
+          clearMode: game.clearMode || false,
         })
       }
       
@@ -380,9 +383,17 @@ app.prepare().then(() => {
           }
           
           // Only allow 0 if there are opponent cells to steal
+          // Allow 7 (clear mode) if at least one board has cells
+          const hasAnyCells = game.boardLeft.some(row => row.some(cell => cell !== null)) || 
+                              game.boardRight.some(row => row.some(cell => cell !== null))
+          
           let finalValue
-          if (hasOpponentCells) {
-            finalValue = Math.floor(Math.random() * 7) // 0-6
+          if (hasOpponentCells && hasAnyCells) {
+            finalValue = Math.floor(Math.random() * 8) // 0-7
+          } else if (hasOpponentCells) {
+            finalValue = Math.floor(Math.random() * 7) // 0-6 (no clear if boards empty)
+          } else if (hasAnyCells) {
+            finalValue = Math.floor(Math.random() * 7) + 1 // 1-7 (no steal if no opponent cells)
           } else {
             finalValue = Math.floor(Math.random() * 6) + 1 // 1-6 only
           }
@@ -393,9 +404,19 @@ app.prepare().then(() => {
           let isColumnFull = false
           
           if (finalValue === 0) {
+            // Steal mode
             game.stealMode = true
+            game.clearMode = false
+            game.allowedColumn = null
+          } else if (finalValue === 7) {
+            // Clear mode - choose board to clear
+            game.stealMode = false
+            game.clearMode = true
             game.allowedColumn = null
           } else {
+            // Normal mode
+            game.stealMode = false
+            game.clearMode = false
             const column = finalValue - 1
             const boardSide = column <= 2 ? 'left' : 'right'
             const colIndex = column <= 2 ? column : column - 3
@@ -423,6 +444,7 @@ app.prepare().then(() => {
             currentPlayer: game.currentPlayer,
             allowedColumn: game.allowedColumn,
             stealMode: game.stealMode,
+            clearMode: game.clearMode || false,
             columnFull: isColumnFull,
           })
         }
@@ -539,14 +561,61 @@ app.prepare().then(() => {
       })
     })
 
+    // Handle clear board (when dice = 7)
+    socket.on('clear-board', (data) => {
+      const game = games.get(data.roomId.toUpperCase())
+      if (!game || !game.gameStarted || game.isRolling || game.winner) return
+      
+      const player = Array.from(game.players.values()).find(p => p.socketId === socket.id)
+      if (!player || player.symbol !== game.currentPlayer) return
+      
+      // Only allow clear mode when dice is 7
+      if (!game.clearMode || game.diceValue !== 7) return
+      
+      // Clear the chosen board
+      if (data.boardSide === 'left') {
+        game.boardLeft = Array(3).fill(null).map(() => Array(3).fill(null))
+      } else {
+        game.boardRight = Array(3).fill(null).map(() => Array(3).fill(null))
+      }
+      
+      console.log(`[CLEAR] Player ${game.currentPlayer} cleared ${data.boardSide} board`)
+      
+      // Switch turn
+      game.currentPlayer = game.currentPlayer === 'X' ? 'O' : 'X'
+      game.clearMode = false
+      game.allowedColumn = null
+      
+      io.to(data.roomId.toUpperCase()).emit('board-cleared', {
+        boardSide: data.boardSide,
+        currentPlayer: game.currentPlayer,
+        boardLeft: game.boardLeft,
+        boardRight: game.boardRight,
+        playSound: true,
+      })
+    })
+
     // Reset game
     socket.on('reset-game', (roomId) => {
       const game = games.get(roomId.toUpperCase())
       if (!game) return
       
+      // Determine who starts next game - the loser starts
+      // If X won, O starts. If O won, X starts. If tie/no winner, X starts (default)
+      let nextStarter = 'X'
+      if (game.winner === 'X') {
+        nextStarter = 'O'
+        console.log(`[RESET] X won, so O starts next game`)
+      } else if (game.winner === 'O') {
+        nextStarter = 'X'
+        console.log(`[RESET] O won, so X starts next game`)
+      } else {
+        console.log(`[RESET] No winner, X starts next game`)
+      }
+      
       game.boardLeft = Array(3).fill(null).map(() => Array(3).fill(null))
       game.boardRight = Array(3).fill(null).map(() => Array(3).fill(null))
-      game.currentPlayer = 'X'
+      game.currentPlayer = nextStarter
       game.diceValue = 1
       game.allowedColumn = null
       game.winner = null

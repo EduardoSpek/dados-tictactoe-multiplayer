@@ -50,6 +50,7 @@ interface GameState {
   allowedColumn: number | null
   winner: string | null
   stealMode: boolean
+  clearMode: boolean
   gameStarted: boolean
   score: { playerX: number; playerO: number }
   columnFull: boolean
@@ -82,6 +83,7 @@ export function useSocket() {
     allowedColumn: null,
     winner: null,
     stealMode: false,
+    clearMode: false,
     gameStarted: false,
     score: { playerX: 0, playerO: 0 },
     columnFull: false,
@@ -160,6 +162,7 @@ export function useSocket() {
       allowedColumn: number | null
       winner: string | null
       stealMode: boolean
+      clearMode?: boolean
     }) => {
       console.log('Sync game state:', data)
       setGameState(prev => ({
@@ -171,6 +174,7 @@ export function useSocket() {
         allowedColumn: data.allowedColumn,
         winner: data.winner,
         stealMode: data.stealMode,
+        clearMode: data.clearMode || false,
         gameStarted: true,
       }))
     })
@@ -184,6 +188,7 @@ export function useSocket() {
       currentPlayer: 'X' | 'O'
       allowedColumn: number | null
       stealMode: boolean
+      clearMode?: boolean
       columnFull?: boolean
     }) => {
       setGameState(prev => ({
@@ -192,6 +197,7 @@ export function useSocket() {
         currentPlayer: data.currentPlayer,
         allowedColumn: data.allowedColumn,
         stealMode: data.stealMode,
+        clearMode: data.clearMode || false,
         isRolling: false,
         columnFull: data.columnFull || false,
       }))
@@ -220,6 +226,8 @@ export function useSocket() {
         currentPlayer: data.currentPlayer,
         winner: data.winner,
         allowedColumn: null,
+        stealMode: false,
+        clearMode: false,
         score: data.score || prev.score,
       }))
     })
@@ -247,7 +255,30 @@ export function useSocket() {
         currentPlayer: data.currentPlayer,
         winner: data.winner,
         stealMode: false,
+        clearMode: false,
         score: data.score || prev.score,
+      }))
+    })
+
+    socket.on('board-cleared', (data: {
+      boardSide: 'left' | 'right'
+      currentPlayer: 'X' | 'O'
+      boardLeft: (string | null)[][]
+      boardRight: (string | null)[][]
+      playSound?: boolean
+    }) => {
+      // Play sound if server sent playSound flag
+      if (data.playSound) {
+        playPlaceMarkSound()
+      }
+      setGameState(prev => ({
+        ...prev,
+        boardLeft: data.boardLeft,
+        boardRight: data.boardRight,
+        currentPlayer: data.currentPlayer,
+        stealMode: false,
+        clearMode: false,
+        allowedColumn: null,
       }))
     })
 
@@ -263,6 +294,7 @@ export function useSocket() {
         currentPlayer: data.currentPlayer,
         winner: null,
         stealMode: false,
+        clearMode: false,
         allowedColumn: null,
         isRolling: false,
         diceValue: 1,
@@ -318,6 +350,11 @@ export function useSocket() {
     socketRef.current.emit('cell-click', { roomId, boardSide, row, col })
   }, [roomId])
 
+  const clearBoard = useCallback((boardSide: 'left' | 'right') => {
+    if (!socketRef.current || !roomId) return
+    socketRef.current.emit('clear-board', { roomId, boardSide })
+  }, [roomId])
+
   const resetGame = useCallback(() => {
     if (!socketRef.current || !roomId) return
     socketRef.current.emit('reset-game', roomId)
@@ -356,6 +393,7 @@ export function useSocket() {
     rejoinRoom,
     rollDice,
     cellClick,
+    clearBoard,
     resetGame,
   }
 }

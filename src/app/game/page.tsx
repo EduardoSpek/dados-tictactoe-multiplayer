@@ -6,6 +6,7 @@ import { useSocket } from '@/hooks/useSocket'
 import useSound from '@/hooks/useSound'
 import Board from '@/components/Board'
 import Dice from '@/components/Dice'
+import confetti from 'canvas-confetti'
 
 export default function GamePage() {
   const searchParams = useSearchParams()
@@ -17,6 +18,7 @@ export default function GamePage() {
     error,
     rollDice,
     cellClick,
+    clearBoard,
     resetGame,
     isConnected,
     joinRoom,
@@ -24,7 +26,7 @@ export default function GamePage() {
     rejoinRoom,
   } = useSocket()
 
-  const { playDiceRoll, playWin, playSteal, playColumnFull } = useSound()
+  const { playDiceRoll, playWin, playSteal, playClear, playColumnFull } = useSound()
 
   const [mounted, setMounted] = useState(false)
   const [joined, setJoined] = useState(false)
@@ -95,6 +97,32 @@ export default function GamePage() {
     
     // Play win sound when someone wins
     playWin()
+    
+    // Trigger confetti animation
+    const duration = 3000
+    const end = Date.now() + duration
+
+    const frame = () => {
+      confetti({
+        particleCount: 5,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0 },
+        colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+      })
+      confetti({
+        particleCount: 5,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1 },
+        colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+      })
+
+      if (Date.now() < end) {
+        requestAnimationFrame(frame)
+      }
+    }
+    frame()
   }, [gameState.winner, mounted, playWin])
 
   // Play steal sound when steal mode activates (dice = 0)
@@ -105,6 +133,15 @@ export default function GamePage() {
       playSteal()
     }
   }, [gameState.stealMode, gameState.diceValue, mounted, playSteal])
+
+  // Play clear sound when clear mode activates (dice = 7)
+  useEffect(() => {
+    if (!mounted) return
+    
+    if (gameState.clearMode && gameState.diceValue === 7) {
+      playClear()
+    }
+  }, [gameState.clearMode, gameState.diceValue, mounted, playClear])
 
   // Play column full sound when column is full
   useEffect(() => {
@@ -230,12 +267,17 @@ export default function GamePage() {
                 currentPlayer={gameState.currentPlayer}
                 allowedColumn={gameState.allowedColumn}
                 onCellClick={(row, col) => {
-                  cellClick('left', row, col)
+                  if (gameState.clearMode) {
+                    clearBoard('left')
+                  } else {
+                    cellClick('left', row, col)
+                  }
                 }}
                 playerName="1-3"
-                isActive={isMyTurn && (leftBoardActive || gameState.stealMode)}
+                isActive={isMyTurn && (leftBoardActive || gameState.stealMode || gameState.clearMode)}
                 diceStart={1}
                 stealMode={gameState.stealMode}
+                clearMode={gameState.clearMode}
               />
             </div>
 
@@ -245,24 +287,41 @@ export default function GamePage() {
                 currentPlayer={gameState.currentPlayer}
                 allowedColumn={gameState.allowedColumn}
                 onCellClick={(row, col) => {
-                  cellClick('right', row, col)
+                  if (gameState.clearMode) {
+                    clearBoard('right')
+                  } else {
+                    cellClick('right', row, col)
+                  }
                 }}
                 playerName="4-6"
-                isActive={isMyTurn && (rightBoardActive || gameState.stealMode)}
+                isActive={isMyTurn && (rightBoardActive || gameState.stealMode || gameState.clearMode)}
                 diceStart={4}
                 stealMode={gameState.stealMode}
+                clearMode={gameState.clearMode}
               />
             </div>
           </div>
 
           {/* Dice Area */}
           {!gameState.winner ? (
-            <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-xl border-2 border-gray-300 dark:border-gray-700 flex flex-col items-center">
+            <div className={`mt-4 p-3 rounded-xl flex flex-col items-center transition-all duration-300 ${
+              isMyTurn && !gameState.isRolling && !gameState.stealMode && !gameState.clearMode && gameState.allowedColumn === null
+                ? 'bg-gradient-to-r from-yellow-100 via-yellow-200 to-yellow-100 dark:from-yellow-900/40 dark:via-yellow-800/40 dark:to-yellow-900/40 border-4 border-yellow-500 dark:border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.6)] animate-pulse'
+                : gameState.stealMode && isMyTurn
+                ? 'bg-gradient-to-r from-purple-100 via-purple-200 to-purple-100 dark:from-purple-900/40 dark:via-purple-800/40 dark:to-purple-900/40 border-4 border-purple-500 dark:border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.6)]'
+                : gameState.clearMode && isMyTurn
+                ? 'bg-gradient-to-r from-red-100 via-red-200 to-red-100 dark:from-red-900/40 dark:via-red-800/40 dark:to-red-900/40 border-4 border-red-500 dark:border-red-400 shadow-[0_0_20px_rgba(239,68,68,0.6)]'
+                : 'bg-gray-100 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700'
+            }`}>
               <div className="text-center mb-2">
                 <p className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">
                   {gameState.stealMode ? (
                     <span className="text-purple-600 dark:text-purple-400">
                       🔥 MODO ROUBO! Clique em uma casa do adversário!
+                    </span>
+                  ) : gameState.clearMode ? (
+                    <span className="text-red-600 dark:text-red-400">
+                      🧹 MODO LIMPAR! Escolha qual tabuleiro limpar!
                     </span>
                   ) : (
                     <>
@@ -276,18 +335,22 @@ export default function GamePage() {
                       >
                         Jogador {gameState.currentPlayer}
                       </span>
-                      {isMyTurn && ' (Você)'}
+                      {isMyTurn && ' (Você) ✅'}
                     </>
                   )}
                 </p>
-                {!gameState.stealMode && (
-                  <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 mt-1">
+                {!gameState.stealMode && !gameState.clearMode && (
+                  <p className={`text-xs md:text-sm mt-1 font-bold ${
+                    isMyTurn && !gameState.isRolling && gameState.allowedColumn === null
+                      ? 'text-yellow-700 dark:text-yellow-300 animate-bounce'
+                      : 'text-gray-600 dark:text-gray-400'
+                  }`}>
                     {gameState.isRolling
                       ? 'Sorteando...'
                       : gameState.allowedColumn !== null
                       ? `Marque na coluna ${(gameState.allowedColumn % 3) + 1}`
                       : canRoll
-                      ? 'Clique no dado para sortear!'
+                      ? '🎲 SUA VEZ! Clique no dado para sortear!'
                       : 'Aguardando...'}
                   </p>
                 )}
