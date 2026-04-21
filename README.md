@@ -16,11 +16,13 @@ Um jogo da velha inovador com mecânicas de dados, dois tabuleiros simultâneos 
 ## ✨ Funcionalidades
 
 ### 🎯 Mecânicas do Jogo
-- **🎲 Sistema de Dados**: Role um dado (0-6) para determinar em qual coluna jogar
+- **🎲 Sistema de Dados**: Role um dado (0-7) para determinar em qual coluna jogar
 - **🔥 Modo Roubo**: Ao tirar **0**, entre no modo roubo e capture casas do adversário!
+- **🧹 Modo Limpar**: Ao tirar **7**, escolha qual tabuleiro limpar completamente!
 - **🎭 Dois Tabuleiros**: Tabuleiros 1-3 e 4-6 com colunas interconectadas
 - **🏆 Placar de Vitórias**: Acompanhe seu desempenho contra oponentes
 - **🔄 Reconexão Automática**: Volte ao jogo mesmo se atualizar a página
+- **✨ Indicador de Vez**: Borda glow amarela pulsante quando é sua vez de jogar
 
 ### 🌐 Multiplayer Online
 - **Crie Salas**: Gere códigos de sala para convidar amigos
@@ -31,7 +33,8 @@ Um jogo da velha inovador com mecânicas de dados, dois tabuleiros simultâneos 
 ### 🎨 Interface
 - **🌙 Modo Escuro**: Interface elegante com tema dark
 - **📱 Responsivo**: Funciona em desktop, tablet e mobile
-- **🔊 Efeitos Sonoros**: Sons imersivos para cada ação
+- **🔊 Efeitos Sonoros**: Sons imersivos para cada ação (dado, roubo, limpar, vitória)
+- **✨ Indicador Visual de Vez**: Borda glow pulsante quando é sua vez
 - **⚡ Animações Suaves**: Transições fluidas e modernas
 
 ---
@@ -96,7 +99,8 @@ Para jogar com amigos na mesma rede:
 1. **Role o dado** para sortear uma coluna (1-6)
 2. **Marque** em uma das casas da coluna sorteada
 3. **Tire 0** para ativar o modo roubo e capturar casas do adversário
-4. **Alinhe 3** em qualquer tabuleiro para vencer!
+4. **Tire 7** para ativar o modo limpar e zerar um tabuleiro completo
+5. **Alinhe 3** em qualquer tabuleiro para vencer!
 
 ---
 
