@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useSocket } from '@/hooks/useSocket'
 import useSound from '@/hooks/useSound'
 import Board from '@/components/Board'
 import Dice from '@/components/Dice'
-import ReactionButton from '@/components/ReactionButton'
+import ReactionButton, { ReactionButtonRef } from '@/components/ReactionButton'
 import confetti from 'canvas-confetti'
 
 export default function GamePage() {
@@ -33,14 +33,21 @@ export default function GamePage() {
   const [mounted, setMounted] = useState(false)
   const [joined, setJoined] = useState(false)
   const [playerName, setPlayerName] = useState('')
-  const [floatingReactions, setFloatingReactions] = useState<{id: number, emoji: string, playerName: string, playerSymbol: 'X' | 'O'}[]>([])
+  const [floatingReactions, setFloatingReactions] = useState<{id: number, emoji: string, playerName: string, playerSymbol: 'X' | 'O', startX: number, startY: number}[]>([])
+  const reactionButtonRef = useRef<ReactionButtonRef>(null)
 
   // Handle reactions from other players
   useEffect(() => {
     const handleReaction = (event: CustomEvent) => {
       const { emoji, playerName, playerSymbol } = event.detail
       const id = Date.now() + Math.random()
-      setFloatingReactions(prev => [...prev, { id, emoji, playerName, playerSymbol }])
+      
+      // Get button position for animation start
+      const buttonRect = reactionButtonRef.current?.getButtonRect()
+      const startX = buttonRect ? buttonRect.left + buttonRect.width / 2 : window.innerWidth / 2
+      const startY = buttonRect ? buttonRect.top : window.innerHeight - 100
+      
+      setFloatingReactions(prev => [...prev, { id, emoji, playerName, playerSymbol, startX, startY }])
       
       // Remove after animation
       setTimeout(() => {
@@ -56,11 +63,17 @@ export default function GamePage() {
     sendReaction(emoji)
     // Also show own reaction locally
     const id = Date.now() + Math.random()
+    const buttonRect = reactionButtonRef.current?.getButtonRect()
+    const startX = buttonRect ? buttonRect.left + buttonRect.width / 2 : window.innerWidth / 2
+    const startY = buttonRect ? buttonRect.top : window.innerHeight - 100
+    
     setFloatingReactions(prev => [...prev, { 
       id, 
       emoji, 
       playerName: playerName || 'Você', 
-      playerSymbol: playerSymbol || 'X' 
+      playerSymbol: playerSymbol || 'X',
+      startX,
+      startY
     }])
     setTimeout(() => {
       setFloatingReactions(prev => prev.filter(r => r.id !== id))
@@ -218,14 +231,16 @@ export default function GamePage() {
 
   return (
     <div className="min-h-screen p-2 md:p-6 lg:p-8 bg-gray-50 dark:bg-gray-900 relative">
-      {/* Floating Reactions */}
+      {/* Floating Reactions - Starting from button position */}
       <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
         {floatingReactions.map((reaction) => (
           <div
             key={reaction.id}
-            className="absolute bottom-32 left-1/2 transform -translate-x-1/2"
+            className="absolute"
             style={{
-              animation: 'floatUp 3s ease-out forwards',
+              left: reaction.startX,
+              top: reaction.startY,
+              animation: 'floatUpFromButton 3s ease-out forwards',
             }}
           >
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full shadow-lg ${
@@ -413,19 +428,35 @@ export default function GamePage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-4">
-                <Dice
-                  value={gameState.diceValue}
-                  size="lg"
-                  isRolling={gameState.isRolling}
-                  onClick={canRoll ? rollDice : undefined}
-                  disabled={!canRoll}
-                />
-                <div className="text-center">
-                  <p className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-                    {gameState.diceValue}
-                  </p>
+              {/* Dice Area - Flex container with two columns */}
+              <div className="flex items-center justify-center gap-4 w-full">
+                {/* Dice - 80% */}
+                <div className="flex-[0.8] flex flex-col items-center justify-center">
+                  <Dice
+                    value={gameState.diceValue}
+                    size="lg"
+                    isRolling={gameState.isRolling}
+                    onClick={canRoll ? rollDice : undefined}
+                    disabled={!canRoll}
+                  />
+                  {/* Dice Value Display */}
+                  <div className="text-center mt-2">
+                    <p className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
+                      {gameState.diceValue}
+                    </p>
+                  </div>
                 </div>
+                
+                {/* Reaction Button - 20% */}
+                {gameState.gameStarted && players.length === 2 && (
+                  <div className="flex-[0.2] flex justify-center items-center">
+                    <ReactionButton
+                      ref={reactionButtonRef}
+                      onReaction={handleSendReaction}
+                      disabled={!isConnected}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -445,14 +476,6 @@ export default function GamePage() {
 
         {/* Controls */}
         <div className="flex justify-center gap-3 mt-4">
-          {/* Reaction Button */}
-          {gameState.gameStarted && players.length === 2 && (
-            <ReactionButton
-              onReaction={handleSendReaction}
-              disabled={!isConnected}
-            />
-          )}
-          
           {gameState.winner && (
             <button
               type="button"
@@ -527,6 +550,24 @@ export default function GamePage() {
           100% {
             opacity: 0;
             transform: translateX(-50%) translateY(-120px) scale(0.8);
+          }
+        }
+        @keyframes floatUpFromButton {
+          0% {
+            opacity: 0;
+            transform: translateX(-50%) translateY(0) scale(0.5);
+          }
+          10% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-20px) scale(1);
+          }
+          90% {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-150px) scale(1);
+          }
+          100% {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-180px) scale(0.8);
           }
         }
       `}</style>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useRef, forwardRef, useImperativeHandle } from 'react'
 
 interface Reaction {
   emoji: string
@@ -16,64 +16,36 @@ const REACTIONS: Reaction[] = [
 ]
 
 interface ReactionButtonProps {
-  onReaction: (emoji: string) => void
+  onReaction: (emoji: string, rect: DOMRect) => void
   disabled?: boolean
 }
 
-interface FloatingReaction {
-  id: number
-  emoji: string
-  playerName: string
-  playerSymbol: 'X' | 'O'
+export interface ReactionButtonRef {
+  getButtonRect: () => DOMRect | null
 }
 
-export default function ReactionButton({ onReaction, disabled = false }: ReactionButtonProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([])
+const ReactionButton = forwardRef<ReactionButtonRef, ReactionButtonProps>(
+  function ReactionButton({ onReaction, disabled = false }, ref) {
+    const [isOpen, setIsOpen] = useState(false)
+    const buttonRef = useRef<HTMLButtonElement>(null)
 
-  const handleReaction = useCallback((emoji: string) => {
-    onReaction(emoji)
-    setIsOpen(false)
-  }, [onReaction])
+    useImperativeHandle(ref, () => ({
+      getButtonRect: () => buttonRef.current?.getBoundingClientRect() || null,
+    }))
 
-  // Add floating reaction when received
-  const addFloatingReaction = useCallback((emoji: string, playerName: string, playerSymbol: 'X' | 'O') => {
-    const id = Date.now() + Math.random()
-    setFloatingReactions(prev => [...prev, { id, emoji, playerName, playerSymbol }])
-    
-    // Remove after animation
-    setTimeout(() => {
-      setFloatingReactions(prev => prev.filter(r => r.id !== id))
-    }, 3000)
-  }, [])
+    const handleReaction = (emoji: string) => {
+      const rect = buttonRef.current?.getBoundingClientRect()
+      if (rect) {
+        onReaction(emoji, rect)
+      }
+      setIsOpen(false)
+    }
 
-  return (
-    <div className="relative">
-      {/* Floating Reactions */}
-      <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
-        {floatingReactions.map((reaction) => (
-          <div
-            key={reaction.id}
-            className="absolute bottom-20 left-1/2 transform -translate-x-1/2 animate-float-up"
-            style={{
-              animation: 'floatUp 3s ease-out forwards',
-            }}
-          >
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-full shadow-lg ${
-              reaction.playerSymbol === 'X' 
-                ? 'bg-blue-500 text-white' 
-                : 'bg-green-500 text-white'
-            }`}>
-              <span className="text-2xl">{reaction.emoji}</span>
-              <span className="text-sm font-bold">{reaction.playerName}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Reaction Button */}
-      <div className="relative">
+    return (
+      <div className="relative flex justify-center">
+        {/* Reaction Button */}
         <button
+          ref={buttonRef}
           onClick={() => !disabled && setIsOpen(!isOpen)}
           disabled={disabled}
           className={`
@@ -89,7 +61,7 @@ export default function ReactionButton({ onReaction, disabled = false }: Reactio
           😀
         </button>
 
-        {/* Emoji Picker Popup */}
+        {/* Emoji Picker Popup - Vertical */}
         {isOpen && (
           <>
             {/* Backdrop */}
@@ -98,9 +70,9 @@ export default function ReactionButton({ onReaction, disabled = false }: Reactio
               onClick={() => setIsOpen(false)}
             />
             
-            {/* Popup */}
+            {/* Popup - Vertical Layout */}
             <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50">
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-gray-600 p-2 flex gap-1">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-gray-600 p-2 flex flex-col gap-1">
                 {REACTIONS.map((reaction) => (
                   <button
                     key={reaction.emoji}
@@ -120,34 +92,10 @@ export default function ReactionButton({ onReaction, disabled = false }: Reactio
           </>
         )}
       </div>
+    )
+  }
+)
 
-      <style jsx>{`
-        @keyframes floatUp {
-          0% {
-            opacity: 0;
-            transform: translateX(-50%) translateY(0) scale(0.5);
-          }
-          10% {
-            opacity: 1;
-            transform: translateX(-50%) translateY(-20px) scale(1);
-          }
-          90% {
-            opacity: 1;
-            transform: translateX(-50%) translateY(-100px) scale(1);
-          }
-          100% {
-            opacity: 0;
-            transform: translateX(-50%) translateY(-120px) scale(0.8);
-          }
-        }
-        .animate-float-up {
-          animation: floatUp 3s ease-out forwards;
-        }
-      `}</style>
-    </div>
-  )
-}
-
-// Export helper to add floating reactions
+export default ReactionButton
 export { REACTIONS }
-export type { FloatingReaction }
+export type { Reaction }
