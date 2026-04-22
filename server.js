@@ -5,7 +5,7 @@ const { Server } = require('socket.io')
 const { v4: uuidv4 } = require('uuid')
 
 const dev = process.env.NODE_ENV !== 'production'
-const hostname = 'localhost'
+const hostname = 'localhost'  // Next.js precisa de localhost
 const port = 3001
 
 const app = next({ dev, hostname, port })
@@ -31,6 +31,13 @@ app.prepare().then(() => {
       origin: '*',
       methods: ['GET', 'POST'],
     },
+    // Connection stability settings for mobile/WiFi
+    pingTimeout: 60000,        // Wait 60s before considering disconnected
+    pingInterval: 25000,       // Ping every 25s to keep connection alive
+    transports: ['websocket', 'polling'],  // Fallback to polling if websocket fails
+    connectTimeout: 45000,     // Connection timeout
+    allowUpgrades: true,       // Allow transport upgrades
+    upgradeTimeout: 10000,     // Upgrade timeout
   })
 
   io.on('connection', (socket) => {
@@ -702,7 +709,8 @@ app.prepare().then(() => {
       console.error(err)
       process.exit(1)
     })
-    .listen(port, () => {
-      console.log(`> Ready on http://${hostname}:${port}`)
+    .listen(port, '0.0.0.0', () => {  // Escuta em todas as interfaces
+      console.log(`> Ready on http://localhost:${port}`)
+      console.log(`> LAN Access: http://192.168.100.39:${port}`)
     })
 })

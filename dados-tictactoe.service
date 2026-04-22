@@ -1,0 +1,15 @@
+[Unit]
+Description=Dados Tic-Tac-Toe Server with Cloudflare Tunnel
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/.nanobot/workspace/dados-tictactoe
+ExecStart=/root/.nanobot/workspace/dados-tictactoe/start-permanent.sh
+ExecStop=/root/.nanobot/workspace/dados-tictactoe/stop-tunnel.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

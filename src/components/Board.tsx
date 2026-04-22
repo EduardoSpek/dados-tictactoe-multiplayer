@@ -72,13 +72,13 @@ export default function Board({ board, currentPlayer, allowedColumn, onCellClick
       <div className="grid grid-cols-3 gap-1 sm:gap-2 mb-2">
         {board.map((row, rowIndex) => (
           row.map((cell, colIndex) => (
-            <button
-              key={`${rowIndex}-${colIndex}`}
-              type="button"
-              onClick={() => onCellClick(rowIndex, colIndex)}
-              disabled={!stealMode && !clearMode && (!isActive || cell !== null)}
-              className={getCellClasses(rowIndex, colIndex, cell)}
-            >
+       <button
+               key={`${rowIndex}-${colIndex}`}
+               type="button"
+               onClick={() => onCellClick(rowIndex, colIndex)}
+               disabled={!stealMode && !clearMode && (!isActive || cell !== null)}
+               className={getCellClasses(rowIndex, colIndex, cell)}
+             >
               {cell}
             </button>
           ))

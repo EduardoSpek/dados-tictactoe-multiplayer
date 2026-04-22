@@ -23,6 +23,7 @@ export default function OfflineGame() {
   const [gameStarted, setGameStarted] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [stealMode, setStealMode] = useState(false)
+  const [clearMode, setClearMode] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -42,49 +43,74 @@ export default function OfflineGame() {
 
   const rollDice = useCallback(() => {
     if (isRolling || winner || allowedColumn !== null || stealMode) return
+    
+    // If in clear mode, allow re-rolling to skip
+    if (clearMode) {
+      setClearMode(false)
+      setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
+      return
+    }
 
     setIsRolling(true)
-    setStealMode(false)
-    playDiceRoll()
+         setStealMode(false)
+         setClearMode(false)
+         playDiceRoll()
 
-    let rolls = 0
+         let rolls = 0
     const maxRolls = 15
     const interval = setInterval(() => {
-      setDiceValue(Math.floor(Math.random() * 6) + 1)
+       setDiceValue(Math.floor(Math.random() * 7) + 1)
       rolls++
 
       if (rolls >= maxRolls) {
         clearInterval(interval)
 
-        // Check if there are opponent cells to steal
+         // Check if there are opponent cells to steal
         const opponent = currentPlayer === 'X' ? 'O' : 'X'
         let hasOpponentCells = false
+        let hasAnyCells = false
         for (let row = 0; row < 3; row++) {
           for (let col = 0; col < 3; col++) {
             if (boardLeft[row][col] === opponent || boardRight[row][col] === opponent) {
               hasOpponentCells = true
-              break
+            }
+            if (boardLeft[row][col] !== null || boardRight[row][col] !== null) {
+              hasAnyCells = true
             }
           }
-          if (hasOpponentCells) break
         }
-
-        // Only allow 0 if there are opponent cells to steal
+          
+          // Only allow 0 if there are opponent cells to steal
+         // Allow 7 if there are any cells to clear (regardless of opponent cells)
         let finalValue: number
-        if (hasOpponentCells) {
+        if (hasOpponentCells && Math.random() < 0.7) { // 70% chance of 0-6 when opponent cells exist
           finalValue = Math.floor(Math.random() * 7) // 0-6
         } else {
-          finalValue = Math.floor(Math.random() * 6) + 1 // 1-6 only
+          // Increase probability of 7 when there are cells to clear
+          if (hasAnyCells && Math.random() < 0.3) { // 30% chance of 7
+            finalValue = 7
+          } else {
+            finalValue = Math.floor(Math.random() * 6) + 1 // 1-6
+          }
         }
 
         setDiceValue(finalValue)
         setIsRolling(false)
 
-        if (finalValue === 0) {
-          setStealMode(true)
-          setAllowedColumn(null)
-          playSteal()
-        } else {
+         if (finalValue === 0) {
+           setStealMode(true)
+           setAllowedColumn(null)
+           playSteal()
+         } else if (finalValue === 7) {
+           if (hasAnyCells) {
+             setClearMode(true)
+             setAllowedColumn(null)
+             playSteal()
+           } else {
+             // No cells to clear, just pass turn
+             setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
+           }
+         } else {
           const column = finalValue - 1
           const boardSide = column <= 2 ? 'left' : 'right'
           const colIndex = column <= 2 ? column : column - 3
@@ -119,8 +145,20 @@ export default function OfflineGame() {
     const setBoard = boardSide === 'left' ? setBoardLeft : setBoardRight
     const cellValue = board[row][col]
 
-    // Steal mode
-    if (stealMode) {
+     // Clear mode
+     if (clearMode) {
+       const boardToClear = boardSide === 'left' ? 'left' : 'right'
+       const newBoard = Array(3).fill(null).map(() => Array(3).fill(null))
+       setBoard(newBoard)
+       
+       playSteal()
+       setClearMode(false)
+       setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
+       return
+     }
+     
+     // Steal mode
+     if (stealMode) {
       const opponent = currentPlayer === 'X' ? 'O' : 'X'
       if (cellValue !== opponent) return
 
@@ -255,29 +293,31 @@ export default function OfflineGame() {
           {/* Boards - Sempre lado a lado */}
           <div className="flex flex-row gap-2 md:gap-6 mb-4">
             <div className="flex-1 min-w-0">
-              <Board
-                board={boardLeft}
-                currentPlayer={currentPlayer}
-                allowedColumn={allowedColumn}
-                onCellClick={(row, col) => handleCellClick('left', row, col)}
-                playerName="1-3"
-                isActive={leftBoardActive || stealMode}
-                diceStart={1}
-                stealMode={stealMode}
-              />
+               <Board
+                 board={boardLeft}
+                 currentPlayer={currentPlayer}
+                 allowedColumn={allowedColumn}
+                 onCellClick={(row, col) => handleCellClick('left', row, col)}
+                 playerName="1-3"
+                 isActive={leftBoardActive || stealMode || clearMode}
+                 diceStart={1}
+                 stealMode={stealMode}
+                 clearMode={clearMode}
+               />
             </div>
 
             <div className="flex-1 min-w-0">
-              <Board
-                board={boardRight}
-                currentPlayer={currentPlayer}
-                allowedColumn={allowedColumn}
-                onCellClick={(row, col) => handleCellClick('right', row, col)}
-                playerName="4-6"
-                isActive={rightBoardActive || stealMode}
-                diceStart={4}
-                stealMode={stealMode}
-              />
+               <Board
+                 board={boardRight}
+                 currentPlayer={currentPlayer}
+                 allowedColumn={allowedColumn}
+                 onCellClick={(row, col) => handleCellClick('right', row, col)}
+                 playerName="4-6"
+                 isActive={rightBoardActive || stealMode || clearMode}
+                 diceStart={4}
+                 stealMode={stealMode}
+                 clearMode={clearMode}
+               />
             </div>
           </div>
 
@@ -285,45 +325,49 @@ export default function OfflineGame() {
           {!winner ? (
             <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-xl border-2 border-gray-300 dark:border-gray-700 flex flex-col items-center">
               <div className="text-center mb-2">
-                <p className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">
-                  {stealMode ? (
-                    <span className="text-purple-600 dark:text-purple-400">
-                      🔥 MODO ROUBO! Clique em uma casa do adversário!
-                    </span>
-                  ) : (
-                    <>
-                      Vez do{' '}
-                      <span
-                        className={
-                          currentPlayer === 'X'
-                            ? 'text-blue-600 dark:text-blue-400'
-                            : 'text-green-600 dark:text-green-400'
-                        }
-                      >
-                        Jogador {currentPlayer}
-                      </span>
-                    </>
-                  )}
-                </p>
-                {!stealMode && (
-                  <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    {isRolling
-                      ? 'Sorteando...'
-                      : allowedColumn !== null
-                      ? `Marque na coluna ${(allowedColumn % 3) + 1}`
-                      : 'Clique no dado para sortear!'}
-                  </p>
-                )}
+                 <p className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">
+                   {stealMode ? (
+                     <span className="text-purple-600 dark:text-purple-400">
+                       🔥 MODO ROUBO! Clique em uma casa do adversário!
+                     </span>
+                   ) : clearMode ? (
+                     <span className="text-red-600 dark:text-red-400">
+                       🧹 MODO LIMPAR! Escolha qual tabuleiro limpar!
+                     </span>
+                   ) : (
+                     <>
+                       Vez do{' '}
+                       <span
+                         className={
+                           currentPlayer === 'X'
+                             ? 'text-blue-600 dark:text-blue-400'
+                             : 'text-green-600 dark:text-green-400'
+                         }
+                       >
+                         Jogador {currentPlayer}
+                       </span>
+                     </>
+                   )}
+                 </p>
+                 {!stealMode && !clearMode && (
+                   <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 mt-1">
+                     {isRolling
+                       ? 'Sorteando...'
+                       : allowedColumn !== null
+                       ? `Marque na coluna ${(allowedColumn % 3) + 1}`
+                       : 'Clique no dado para sortear!'}
+                   </p>
+                 )}
               </div>
 
               <div className="flex items-center gap-4">
-                <Dice
-                  value={diceValue}
-                  size="lg"
-                  isRolling={isRolling}
-                  onClick={rollDice}
-                  disabled={isRolling || allowedColumn !== null || stealMode}
-                />
+                 <Dice
+                   value={diceValue}
+                   size="lg"
+                   isRolling={isRolling}
+                   onClick={rollDice}
+                   disabled={isRolling || allowedColumn !== null || stealMode || clearMode}
+                 />
                 <div className="text-center">
                   <p className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
                     {diceValue}

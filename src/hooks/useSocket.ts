@@ -91,13 +91,32 @@ export function useSocket() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Initialize socket connection - use current host (works with IP or localhost)
-    const serverUrl = typeof window !== 'undefined' 
-      ? `http://${window.location.hostname}:3001`
-      : 'http://localhost:3001'
+    // Initialize socket connection
+    let serverUrl: string
+    
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname
+      
+      // Se for localhost ou IP local, usa porta 3001
+      if (hostname === 'localhost' || /^192\.168\./.test(hostname) || /^10\./.test(hostname)) {
+        serverUrl = `http://${hostname}:3001`
+      } else {
+        // Cloudflare tunnel ou outro domínio: usa a URL atual (sem porta)
+        serverUrl = window.location.origin
+      }
+    } else {
+      serverUrl = 'http://localhost:3001'
+    }
+    
+    console.log('Connecting to:', serverUrl)
     
     const socket = io(serverUrl, {
       transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
     })
 
     socketRef.current = socket
