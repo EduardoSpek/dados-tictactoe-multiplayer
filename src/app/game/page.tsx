@@ -22,6 +22,8 @@ export default function GamePage() {
     clearBoard,
     resetGame,
     sendReaction,
+    buyMode,
+    cancelMode,
     isConnected,
     joinRoom,
     joinAsCreator,
@@ -455,8 +457,8 @@ export default function GamePage() {
                     value={gameState.diceValue}
                     size="lg"
                     isRolling={gameState.isRolling}
-                    onClick={canRoll ? rollDice : undefined}
-                    disabled={!canRoll}
+                    onClick={canRoll ? rollDice : (gameState.stealMode || gameState.clearMode || gameState.inversionMode) ? cancelMode : undefined}
+                    disabled={!canRoll && !(gameState.stealMode || gameState.clearMode || gameState.inversionMode)}
                   />
                   {/* Dice Value Display - Ao lado direito */}
                   <div className="text-center">
@@ -469,12 +471,49 @@ export default function GamePage() {
               
               {/* Reaction Button Area - 20% */}
               {gameState.gameStarted && players.length === 2 && (
-                <div className="flex-[0.2] flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-xl border-2 border-gray-300 dark:border-gray-700 p-2">
+                <div className="flex-[0.2] flex flex-col items-center justify-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl border-2 border-gray-300 dark:border-gray-700 p-2">
                   <ReactionButton
                     ref={reactionButtonRef}
                     onReaction={handleSendReaction}
                     disabled={!isConnected}
                   />
+
+                  {/* Buy Mode Button - Floating */}
+                  {gameState.currentPlayer === playerSymbol && !gameState.winner && (playerSymbol === 'X' ? gameState.coins.playerX : gameState.coins.playerO) >= 1 && (
+                    <div className="relative">
+                      <button
+                        onClick={() => document.getElementById('buy-menu')?.classList.toggle('hidden')}
+                        className="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg transition-colors"
+                      >
+                        🪙 {(playerSymbol === 'X' ? gameState.coins.playerX : gameState.coins.playerO)}
+                      </button>
+
+                      {/* Floating Menu */}
+                      <div id="buy-menu" className="hidden absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 p-2 z-50 min-w-[140px]">
+                        <button
+                          onClick={() => { buyMode('steal'); document.getElementById('buy-menu')?.classList.add('hidden'); }}
+                          disabled={gameState.isRolling}
+                          className="w-full px-3 py-2 mb-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white text-sm font-bold rounded-lg transition-colors"
+                        >
+                          🔥 Roubar
+                        </button>
+                        <button
+                          onClick={() => { buyMode('clear'); document.getElementById('buy-menu')?.classList.add('hidden'); }}
+                          disabled={gameState.isRolling}
+                          className="w-full px-3 py-2 mb-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white text-sm font-bold rounded-lg transition-colors"
+                        >
+                          🧹 Limpar
+                        </button>
+                        <button
+                          onClick={() => { buyMode('invert'); document.getElementById('buy-menu')?.classList.add('hidden'); }}
+                          disabled={gameState.isRolling}
+                          className="w-full px-3 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white text-sm font-bold rounded-lg transition-colors"
+                        >
+                          🎭 Inverter
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

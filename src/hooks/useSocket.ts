@@ -54,6 +54,7 @@ interface GameState {
   inversionMode: boolean
   gameStarted: boolean
   score: { playerX: number; playerO: number }
+  coins: { playerX: number; playerO: number }
   columnFull: boolean
 }
 
@@ -88,6 +89,7 @@ export function useSocket() {
     inversionMode: false,
     gameStarted: false,
     score: { playerX: 0, playerO: 0 },
+    coins: { playerX: 0, playerO: 0 },
     columnFull: false,
   })
   const [error, setError] = useState<string | null>(null)
@@ -238,6 +240,7 @@ export function useSocket() {
       boardLeft: (string | null)[][]
       boardRight: (string | null)[][]
       score?: { playerX: number; playerO: number }
+      coins?: { playerX: number; playerO: number }
       playSound?: boolean
     }) => {
       // Play sound if server sent playSound flag
@@ -253,7 +256,9 @@ export function useSocket() {
         allowedColumn: null,
         stealMode: false,
         clearMode: false,
+        inversionMode: false,
         score: data.score || prev.score,
+        coins: data.coins || prev.coins,
       }))
     })
 
@@ -356,6 +361,55 @@ export function useSocket() {
       setError(null) // Clear error when opponent reconnects
     })
 
+    // Listen for mode bought
+    socket.on('mode-bought', (data: {
+      mode: string
+      currentPlayer: 'X' | 'O'
+      coins: { playerX: number; playerO: number }
+      stealMode: boolean
+      clearMode: boolean
+      inversionMode: boolean
+    }) => {
+      console.log('Mode bought:', data)
+      setGameState(prev => ({
+        ...prev,
+        currentPlayer: data.currentPlayer,
+        coins: data.coins,
+        stealMode: data.stealMode,
+        clearMode: data.clearMode,
+        inversionMode: data.inversionMode,
+      }))
+    })
+
+    // Listen for buy failed
+    socket.on('buy-failed', (data: { reason: string }) => {
+      console.log('Buy failed:', data.reason)
+      if (data.reason === 'moedas') {
+        setError('Moedas insuficientes!')
+      } else if (data.reason === 'sem-oponente') {
+        setError('Não há marcas do oponente!')
+      } else if (data.reason === 'sem-marca') {
+        setError('Precisa de marcas X e O no tabuleiro!')
+      }
+    })
+
+    // Listen for mode cancelled
+    socket.on('mode-cancelled', (data: {
+      currentPlayer: 'X' | 'O'
+      stealMode: boolean
+      clearMode: boolean
+      inversionMode: boolean
+    }) => {
+      console.log('Mode cancelled:', data)
+      setGameState(prev => ({
+        ...prev,
+        currentPlayer: data.currentPlayer,
+        stealMode: data.stealMode,
+        clearMode: data.clearMode,
+        inversionMode: data.inversionMode,
+      }))
+    })
+
     // Listen for reactions
     socket.on('reaction-received', (data: {
       emoji: string
@@ -403,6 +457,21 @@ export function useSocket() {
   const rollDice = useCallback(() => {
     if (!socketRef.current || !roomId) return
     socketRef.current.emit('roll-dice', roomId)
+  }, [roomId])
+
+  const buyMode = useCallback((mode: 'steal' | 'clear' | 'invert') => {
+    console.log('[buyMode] Called with mode:', mode, 'roomId:', roomId, 'socket:', !!socketRef.current)
+    if (!socketRef.current || !roomId) {
+      console.log('[buyMode] Early return - no socket or roomId')
+      return
+    }
+    socketRef.current.emit('buy-mode', { roomId, mode })
+    console.log('[buyMode] Emitted buy-mode event')
+  }, [roomId])
+
+  const cancelMode = useCallback(() => {
+    if (!socketRef.current || !roomId) return
+    socketRef.current.emit('cancel-mode', roomId)
   }, [roomId])
 
   const cellClick = useCallback((boardSide: 'left' | 'right', row: number, col: number) => {
@@ -457,6 +526,8 @@ export function useSocket() {
     joinAsCreator,
     rejoinRoom,
     rollDice,
+    buyMode,
+    cancelMode,
     cellClick,
     clearBoard,
     resetGame,
