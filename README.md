@@ -30,6 +30,14 @@ Um jogo da velha inovador com mecânicas de dados, dois tabuleiros simultâneos 
 - **✨ Indicador de Vez**: Borda glow amarela pulsante quando é sua vez de jogar
 - **😀 Reações com Emoji**: Comunique-se com oponente usando emojis (feliz, triste, raiva, risada, descolado)
 
+### 💰 Sistema de Moedas e Compras
+- **🪙 Ganhe Moedas**: Receba 1 moeda ao vencer uma rodada
+- **💎 Sequência de Vitórias**: Acumule bônus com vitórias consecutivas (streak)
+- **🛒 Compre Modos Especiais**: Use moedas para ativar poderes:
+  - **Limpar Tabuleiro (1 moeda)**: Limpe todas as casas do oponente em um tabuleiro
+  - **Restaurar Tabuleiro (2 moedas)**: Restaure o tabuleiro que foi limpo pelo oponente
+- **🔄 Cancelar Compra**: Cancele um modo comprado antes de usar
+
 ### 🌐 Multiplayer Online
 - **Crie Salas**: Gere códigos de sala para convidar amigos
 - **Código na Área de Transferência**: Ao criar sala, o código é copiado automaticamente

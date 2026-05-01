@@ -52,6 +52,7 @@ interface GameState {
   stealMode: boolean
   clearMode: boolean
   inversionMode: boolean
+  restoreMode: boolean
   gameStarted: boolean
   score: { playerX: number; playerO: number }
   coins: { playerX: number; playerO: number }
@@ -87,6 +88,7 @@ export function useSocket() {
     stealMode: false,
     clearMode: false,
     inversionMode: false,
+    restoreMode: false,
     gameStarted: false,
     score: { playerX: 0, playerO: 0 },
     coins: { playerX: 0, playerO: 0 },
@@ -187,6 +189,7 @@ export function useSocket() {
       stealMode: boolean
       clearMode?: boolean
       inversionMode?: boolean
+      restoreMode?: boolean
     }) => {
       console.log('Sync game state:', data)
       setGameState(prev => ({
@@ -200,6 +203,7 @@ export function useSocket() {
         stealMode: data.stealMode,
         clearMode: data.clearMode || false,
         inversionMode: data.inversionMode || false,
+        restoreMode: data.restoreMode || false,
         gameStarted: true,
       }))
     })
@@ -215,6 +219,7 @@ export function useSocket() {
       stealMode: boolean
       clearMode?: boolean
       inversionMode?: boolean
+      restoreMode?: boolean
       columnFull?: boolean
     }) => {
       setGameState(prev => ({
@@ -225,6 +230,7 @@ export function useSocket() {
         stealMode: data.stealMode,
         clearMode: data.clearMode || false,
         inversionMode: data.inversionMode || false,
+        restoreMode: data.restoreMode || false,
         isRolling: false,
         columnFull: data.columnFull || false,
       }))
@@ -257,6 +263,7 @@ export function useSocket() {
         stealMode: false,
         clearMode: false,
         inversionMode: false,
+        restoreMode: false,
         score: data.score || prev.score,
         coins: data.coins || prev.coins,
       }))
@@ -272,6 +279,7 @@ export function useSocket() {
       boardLeft: (string | null)[][]
       boardRight: (string | null)[][]
       score?: { playerX: number; playerO: number }
+      coins?: { playerX: number; playerO: number }
       playSound?: boolean
     }) => {
       // Play sound if server sent playSound flag
@@ -287,6 +295,7 @@ export function useSocket() {
         stealMode: false,
         clearMode: false,
         score: data.score || prev.score,
+        coins: data.coins || prev.coins,
       }))
     })
 
@@ -308,6 +317,26 @@ export function useSocket() {
         currentPlayer: data.currentPlayer,
         stealMode: false,
         clearMode: false,
+        restoreMode: false,
+        allowedColumn: null,
+      }))
+    })
+
+    socket.on('board-restored', (data: {
+      currentPlayer: 'X' | 'O'
+      boardLeft: (string | null)[][]
+      boardRight: (string | null)[][]
+      playSound?: boolean
+    }) => {
+      if (data.playSound) {
+        playPlaceMarkSound()
+      }
+      setGameState(prev => ({
+        ...prev,
+        boardLeft: data.boardLeft,
+        boardRight: data.boardRight,
+        currentPlayer: data.currentPlayer,
+        restoreMode: false,
         allowedColumn: null,
       }))
     })
@@ -330,6 +359,7 @@ export function useSocket() {
         stealMode: false,
         clearMode: false,
         inversionMode: false,
+        restoreMode: false,
         allowedColumn: null,
       }))
     })
@@ -338,6 +368,7 @@ export function useSocket() {
       boardLeft: (string | null)[][]
       boardRight: (string | null)[][]
       currentPlayer: 'X' | 'O'
+      coins: { playerX: number; playerO: number }
     }) => {
       setGameState(prev => ({
         ...prev,
@@ -350,6 +381,7 @@ export function useSocket() {
         allowedColumn: null,
         isRolling: false,
         diceValue: 1,
+        coins: data.coins,
       }))
     })
 
@@ -369,6 +401,7 @@ export function useSocket() {
       stealMode: boolean
       clearMode: boolean
       inversionMode: boolean
+      restoreMode: boolean
     }) => {
       console.log('Mode bought:', data)
       setGameState(prev => ({
@@ -378,6 +411,7 @@ export function useSocket() {
         stealMode: data.stealMode,
         clearMode: data.clearMode,
         inversionMode: data.inversionMode,
+        restoreMode: data.restoreMode,
       }))
     })
 
@@ -390,6 +424,8 @@ export function useSocket() {
         setError('Não há marcas do oponente!')
       } else if (data.reason === 'sem-marca') {
         setError('Precisa de marcas X e O no tabuleiro!')
+      } else if (data.reason === 'sem-limpar') {
+        setError('O adversário não limpou nenhum tabuleiro ainda!')
       }
     })
 
@@ -459,7 +495,7 @@ export function useSocket() {
     socketRef.current.emit('roll-dice', roomId)
   }, [roomId])
 
-  const buyMode = useCallback((mode: 'steal' | 'clear' | 'invert') => {
+  const buyMode = useCallback((mode: 'steal' | 'clear' | 'invert' | 'restore') => {
     console.log('[buyMode] Called with mode:', mode, 'roomId:', roomId, 'socket:', !!socketRef.current)
     if (!socketRef.current || !roomId) {
       console.log('[buyMode] Early return - no socket or roomId')
@@ -482,6 +518,11 @@ export function useSocket() {
   const clearBoard = useCallback((boardSide: 'left' | 'right') => {
     if (!socketRef.current || !roomId) return
     socketRef.current.emit('clear-board', { roomId, boardSide })
+  }, [roomId])
+
+  const restoreBoard = useCallback(() => {
+    if (!socketRef.current || !roomId) return
+    socketRef.current.emit('restore-board', { roomId })
   }, [roomId])
 
   const resetGame = useCallback(() => {
@@ -530,6 +571,7 @@ export function useSocket() {
     cancelMode,
     cellClick,
     clearBoard,
+    restoreBoard,
     resetGame,
     sendReaction,
     socketRef,

@@ -20,6 +20,7 @@ export default function GamePage() {
     rollDice,
     cellClick,
     clearBoard,
+    restoreBoard,
     resetGame,
     sendReaction,
     buyMode,
@@ -238,7 +239,7 @@ export default function GamePage() {
   }
 
   const isMyTurn = playerSymbol === gameState.currentPlayer
-  const canRoll = isMyTurn && !gameState.isRolling && !gameState.winner && !gameState.allowedColumn && !gameState.stealMode && !gameState.clearMode
+  const canRoll = isMyTurn && !gameState.isRolling && !gameState.winner && !gameState.allowedColumn && !gameState.stealMode && !gameState.clearMode && !gameState.restoreMode
   const leftBoardActive = gameState.allowedColumn !== null && gameState.allowedColumn <= 2
   const rightBoardActive = gameState.allowedColumn !== null && gameState.allowedColumn >= 3
 
@@ -352,9 +353,9 @@ export default function GamePage() {
                 currentPlayer={gameState.currentPlayer}
                 allowedColumn={gameState.allowedColumn}
                 onCellClick={(row, col) => {
-                  if (gameState.inversionMode) {
-                    // Inversion mode - swap all marks
-                    // Emit event to server to handle inversion
+                  if (gameState.restoreMode) {
+                    restoreBoard()
+                  } else if (gameState.inversionMode) {
                     socketRef.current?.emit('invert-marks', { roomId })
                   } else if (gameState.clearMode) {
                     clearBoard('left')
@@ -363,11 +364,12 @@ export default function GamePage() {
                   }
                 }}
                 playerName="1-3"
-                isActive={isMyTurn && (leftBoardActive || gameState.stealMode || gameState.clearMode || gameState.inversionMode)}
+                isActive={isMyTurn && (leftBoardActive || gameState.stealMode || gameState.clearMode || gameState.inversionMode || gameState.restoreMode)}
                 diceStart={1}
                 stealMode={gameState.stealMode}
                 clearMode={gameState.clearMode}
                 inversionMode={gameState.inversionMode}
+                restoreMode={gameState.restoreMode}
               />
             </div>
 
@@ -377,7 +379,9 @@ export default function GamePage() {
                 currentPlayer={gameState.currentPlayer}
                 allowedColumn={gameState.allowedColumn}
                 onCellClick={(row, col) => {
-                  if (gameState.inversionMode) {
+                  if (gameState.restoreMode) {
+                    restoreBoard()
+                  } else if (gameState.inversionMode) {
                     socketRef.current?.emit('invert-marks', { roomId })
                   } else if (gameState.clearMode) {
                     clearBoard('right')
@@ -386,11 +390,12 @@ export default function GamePage() {
                   }
                 }}
                 playerName="4-6"
-                isActive={isMyTurn && (rightBoardActive || gameState.stealMode || gameState.clearMode || gameState.inversionMode)}
+                isActive={isMyTurn && (rightBoardActive || gameState.stealMode || gameState.clearMode || gameState.inversionMode || gameState.restoreMode)}
                 diceStart={4}
                 stealMode={gameState.stealMode}
                 clearMode={gameState.clearMode}
                 inversionMode={gameState.inversionMode}
+                restoreMode={gameState.restoreMode}
               />
             </div>
           </div>
@@ -400,12 +405,14 @@ export default function GamePage() {
             <div className="flex items-stretch justify-center gap-3 mt-4">
               {/* Dice Area - 80% with turn indicator border */}
               <div className={`flex-[0.8] p-3 rounded-xl flex flex-col items-center transition-all duration-300 ${
-                isMyTurn && !gameState.isRolling && !gameState.stealMode && !gameState.clearMode && gameState.allowedColumn === null
+                isMyTurn && !gameState.isRolling && !gameState.stealMode && !gameState.clearMode && !gameState.restoreMode && gameState.allowedColumn === null
                   ? 'bg-gradient-to-r from-yellow-100 via-yellow-200 to-yellow-100 dark:from-yellow-900/40 dark:via-yellow-800/40 dark:to-yellow-900/40 border-4 border-yellow-500 dark:border-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.6)] animate-pulse'
                   : gameState.stealMode && isMyTurn
                   ? 'bg-gradient-to-r from-purple-100 via-purple-200 to-purple-100 dark:from-purple-900/40 dark:via-purple-800/40 dark:to-purple-900/40 border-4 border-purple-500 dark:border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.6)]'
                   : gameState.clearMode && isMyTurn
                   ? 'bg-gradient-to-r from-red-100 via-red-200 to-red-100 dark:from-red-900/40 dark:via-red-800/40 dark:to-red-900/40 border-4 border-red-500 dark:border-red-400 shadow-[0_0_20px_rgba(239,68,68,0.6)]'
+                  : gameState.restoreMode && isMyTurn
+                  ? 'bg-gradient-to-r from-green-100 via-green-200 to-green-100 dark:from-green-900/40 dark:via-green-800/40 dark:to-green-900/40 border-4 border-green-500 dark:border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.6)]'
                   : 'bg-gray-100 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700'
               }`}>
                 <div className="text-center mb-2">
@@ -417,6 +424,10 @@ export default function GamePage() {
                     ) : gameState.clearMode ? (
                       <span className="text-red-600 dark:text-red-400">
                         🧹 MODO LIMPAR! Escolha qual tabuleiro limpar!
+                      </span>
+                    ) : gameState.restoreMode ? (
+                      <span className="text-green-600 dark:text-green-400">
+                        ♻️ MODO RESTAURAR! Clique em qualquer tabuleiro para restaurar!
                       </span>
                     ) : (
                       <>
@@ -434,7 +445,7 @@ export default function GamePage() {
                       </>
                     )}
                   </p>
-                  {!gameState.stealMode && !gameState.clearMode && (
+                  {!gameState.stealMode && !gameState.clearMode && !gameState.restoreMode && (
                     <p className={`text-xs md:text-sm mt-1 font-bold ${
                       isMyTurn && !gameState.isRolling && gameState.allowedColumn === null
                         ? 'text-yellow-700 dark:text-yellow-300 animate-bounce'
@@ -457,8 +468,8 @@ export default function GamePage() {
                     value={gameState.diceValue}
                     size="lg"
                     isRolling={gameState.isRolling}
-                    onClick={canRoll ? rollDice : (gameState.stealMode || gameState.clearMode || gameState.inversionMode) ? cancelMode : undefined}
-                    disabled={!canRoll && !(gameState.stealMode || gameState.clearMode || gameState.inversionMode)}
+                    onClick={canRoll ? rollDice : (gameState.stealMode || gameState.clearMode || gameState.inversionMode || gameState.restoreMode) ? cancelMode : undefined}
+                    disabled={!canRoll && !(gameState.stealMode || gameState.clearMode || gameState.inversionMode || gameState.restoreMode)}
                   />
                   {/* Dice Value Display - Ao lado direito */}
                   <div className="text-center">
@@ -477,43 +488,46 @@ export default function GamePage() {
                     onReaction={handleSendReaction}
                     disabled={!isConnected}
                   />
-
-                  {/* Buy Mode Button - Floating */}
-                  {gameState.currentPlayer === playerSymbol && !gameState.winner && (playerSymbol === 'X' ? gameState.coins.playerX : gameState.coins.playerO) >= 1 && (
-                    <div className="relative">
+                  {/* Coins Display - Always Visible */}
+                  <div className="relative">
+                    <button
+                      onClick={() => document.getElementById('buy-menu')?.classList.toggle('hidden')}
+                      className="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg transition-colors"
+                    >
+                      🪙 {(playerSymbol === 'X' ? gameState.coins.playerX : gameState.coins.playerO)}
+                    </button>
+                    {/* Floating Menu */}
+                    <div id="buy-menu" className="hidden absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 p-2 z-50 min-w-[140px]">
                       <button
-                        onClick={() => document.getElementById('buy-menu')?.classList.toggle('hidden')}
-                        className="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg transition-colors"
+                        onClick={() => { buyMode('steal'); document.getElementById('buy-menu')?.classList.add('hidden'); }}
+                        disabled={gameState.isRolling}
+                        className="w-full px-3 py-2 mb-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white text-sm font-bold rounded-lg transition-colors"
                       >
-                        🪙 {(playerSymbol === 'X' ? gameState.coins.playerX : gameState.coins.playerO)}
+                        🔥 Roubar
                       </button>
-
-                      {/* Floating Menu */}
-                      <div id="buy-menu" className="hidden absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-300 dark:border-gray-600 p-2 z-50 min-w-[140px]">
-                        <button
-                          onClick={() => { buyMode('steal'); document.getElementById('buy-menu')?.classList.add('hidden'); }}
-                          disabled={gameState.isRolling}
-                          className="w-full px-3 py-2 mb-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white text-sm font-bold rounded-lg transition-colors"
-                        >
-                          🔥 Roubar
-                        </button>
-                        <button
-                          onClick={() => { buyMode('clear'); document.getElementById('buy-menu')?.classList.add('hidden'); }}
-                          disabled={gameState.isRolling}
-                          className="w-full px-3 py-2 mb-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white text-sm font-bold rounded-lg transition-colors"
-                        >
-                          🧹 Limpar
-                        </button>
-                        <button
-                          onClick={() => { buyMode('invert'); document.getElementById('buy-menu')?.classList.add('hidden'); }}
-                          disabled={gameState.isRolling}
-                          className="w-full px-3 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white text-sm font-bold rounded-lg transition-colors"
-                        >
-                          🎭 Inverter
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => { buyMode('clear'); document.getElementById('buy-menu')?.classList.add('hidden'); }}
+                        disabled={gameState.isRolling}
+                        className="w-full px-3 py-2 mb-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white text-sm font-bold rounded-lg transition-colors"
+                      >
+                        🧹 Limpar
+                      </button>
+                      <button
+                        onClick={() => { buyMode('invert'); document.getElementById('buy-menu')?.classList.add('hidden'); }}
+                        disabled={gameState.isRolling}
+                        className="w-full px-3 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white text-sm font-bold rounded-lg transition-colors"
+                      >
+                        🎭 Inverter
+                      </button>
+                      <button
+                        onClick={() => { buyMode('restore'); document.getElementById('buy-menu')?.classList.add('hidden'); }}
+                        disabled={gameState.isRolling || (playerSymbol === 'X' ? gameState.coins.playerX : gameState.coins.playerO) < 2}
+                        className="w-full px-3 py-2 mt-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white text-sm font-bold rounded-lg transition-colors"
+                      >
+                        ♻️ Restaurar (2🪙)
+                      </button>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>

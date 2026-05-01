@@ -13,9 +13,10 @@ interface BoardProps {
   stealMode?: boolean
   clearMode?: boolean
   inversionMode?: boolean
+  restoreMode?: boolean
 }
 
-export default function Board({ board, currentPlayer, allowedColumn, onCellClick, playerName, isActive, diceStart, stealMode = false, clearMode = false, inversionMode = false }: BoardProps) {
+export default function Board({ board, currentPlayer, allowedColumn, onCellClick, playerName, isActive, diceStart, stealMode = false, clearMode = false, inversionMode = false, restoreMode = false }: BoardProps) {
   const getCellClasses = (row: number, col: number, value: string | null) => {
     const actualCol = diceStart === 4 ? col + 3 : col
     const opponent = currentPlayer === 'X' ? 'O' : 'X'
@@ -39,6 +40,9 @@ export default function Board({ board, currentPlayer, allowedColumn, onCellClick
     } else if (inversionMode && isActive) {
       // Inversion mode styling - entire board is clickable and pulsing
       baseClasses += ' bg-purple-300 dark:bg-purple-800 border-purple-500 dark:border-purple-400 text-purple-800 dark:text-purple-200 shadow-inner cursor-pointer hover:bg-purple-400 dark:hover:bg-purple-700 animate-pulse'
+    } else if (restoreMode && isActive) {
+      // Restore mode styling - entire board is clickable and pulsing
+      baseClasses += ' bg-green-300 dark:bg-green-800 border-green-500 dark:border-green-400 text-green-800 dark:text-green-200 shadow-inner cursor-pointer hover:bg-green-400 dark:hover:bg-green-700 animate-pulse'
     } else if (value === 'X') {
       if (isStealable) {
         baseClasses += ' bg-red-300 dark:bg-red-800 border-red-600 dark:border-red-400 text-red-800 dark:text-red-200 shadow-inner cursor-pointer hover:bg-red-400 dark:hover:bg-red-700 animate-pulse'
@@ -80,7 +84,7 @@ export default function Board({ board, currentPlayer, allowedColumn, onCellClick
                 key={`${rowIndex}-${colIndex}`}
                 type="button"
                 onClick={() => onCellClick(rowIndex, colIndex)}
-                disabled={!stealMode && !clearMode && !inversionMode && (!isActive || cell !== null)}
+                disabled={!stealMode && !clearMode && !inversionMode && !restoreMode && (!isActive || cell !== null)}
                 className={getCellClasses(rowIndex, colIndex, cell)}
               >
                {cell}

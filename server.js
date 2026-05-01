@@ -60,8 +60,16 @@ app.prepare().then(() => {
         allowedColumn: null,
         winner: null,
         stealMode: false,
+        clearMode: false,
+        inversionMode: false,
+        inversionModeBought: false,
+        restoreMode: false,
+        lastClearBy: null,
+        boardBeforeClear: null,
         gameStarted: false,
-        score: { playerX: 0, playerO: 0 }, // Add score tracking
+        score: { playerX: 0, playerO: 0 },
+        coins: { playerX: 0, playerO: 0 },
+        winStreak: { playerX: 0, playerO: 0 },
       }
       
       // Add creator as first player (X)
@@ -104,24 +112,22 @@ app.prepare().then(() => {
         callback(true, `Reconectado como Jogador ${existingPlayer.symbol}`)
         return
       }
-      
+
       // Check if player is trying to join as second player but room has disconnected creator
       const disconnectedPlayer = Array.from(game.players.values()).find(p => p.disconnectedAt)
-      if (disconnectedPlayer) {
-        console.log(`[JOIN] Found disconnected player ${disconnectedPlayer.name}, waiting for reconnection`)
+
+      // Count only connected players
+      const connectedPlayers = Array.from(game.players.values()).filter(p => !p.disconnectedAt)
+
+      if (connectedPlayers.length >= 2) {
+        console.log(`[JOIN] Room ${data.roomId} is FULL (2 connected players)`)
+        callback(false, 'Sala cheia')
+        return
       }
-      
-      if (game.players.size >= 2) {
-        // Check if all players are actually connected
-        const connectedPlayers = Array.from(game.players.values()).filter(p => !p.disconnectedAt)
-        if (connectedPlayers.length >= 2) {
-          console.log(`[JOIN] Room ${data.roomId} is FULL (2 connected players)`)
-          callback(false, 'Sala cheia')
-          return
-        }
-      }
-      
-      const symbol = 'O' // Second player is always O
+
+      // If there's a disconnected player, allow new player to join
+      // The disconnected player will need to rejoin when they come back
+      const symbol = connectedPlayers.length === 0 ? 'X' : 'O'
       const player = {
         id: uuidv4(),
         socketId: socket.id,
@@ -164,10 +170,10 @@ app.prepare().then(() => {
       console.log(`[JOIN] Broadcast player-joined to room ${data.roomId}`)
       
       // Start game if 2 players (and both are connected)
-      const connectedPlayers = Array.from(game.players.values()).filter(p => !p.disconnectedAt)
-      if (connectedPlayers.length === 2 && !game.gameStarted) {
+      const connectedNow = Array.from(game.players.values()).filter(p => !p.disconnectedAt)
+      if (connectedNow.length === 2 && !game.gameStarted) {
         game.gameStarted = true
-        const playersList = connectedPlayers.map(p => ({ name: p.name, symbol: p.symbol }))
+        const playersList = connectedNow.map(p => ({ name: p.name, symbol: p.symbol }))
         
         // Notify both players to start game
         io.to(data.roomId.toUpperCase()).emit('start-game', {
@@ -229,9 +235,10 @@ app.prepare().then(() => {
       
       // Notify other player that creator reconnected
       socket.to(roomId.toUpperCase()).emit('player-rejoined')
-      
-      // If game already started with 2 players, notify creator with full game state
-      if (game.players.size === 2 && game.gameStarted) {
+
+      // If game already started with 2 connected players, notify creator with full game state
+      const connectedNow = Array.from(game.players.values()).filter(p => !p.disconnectedAt)
+      if (connectedNow.length === 2 && game.gameStarted) {
         console.log(`[CREATOR] Game already started, sending game-started event`)
         socket.emit('game-started', {
           currentPlayer: game.currentPlayer,
@@ -523,6 +530,187 @@ app.prepare().then(() => {
       }, 80)
     })
 
+    // Buy mode with coins
+    socket.on('buy-mode', (data) => {
+      const { roomId, mode } = data
+      console.log(`[BUY] Request: room=${roomId}, mode=${mode}, socket=${socket.id}`)
+
+      const game = games.get(roomId.toUpperCase())
+      if (!game) {
+        console.log(`[BUY] Room ${roomId} not found`)
+        return
+      }
+      if (game.isRolling) {
+        console.log(`[BUY] Already rolling`)
+        return
+      }
+      if (game.winner) {
+        console.log(`[BUY] Game already has winner: ${game.winner}`)
+        return
+      }
+      if (!game.gameStarted) {
+        console.log(`[BUY] Game not started yet`)
+        return
+      }
+
+      const player = Array.from(game.players.values()).find(p => p.socketId === socket.id)
+      if (!player) {
+        console.log(`[BUY] Player not found in room`)
+        return
+      }
+      if (player.symbol !== game.currentPlayer) {
+        console.log(`[BUY] Not player's turn. Player=${player.symbol}, Current=${game.currentPlayer}`)
+        return
+      }
+
+      // Check if player has enough coins
+      const playerCoins = player.symbol === 'X' ? game.coins.playerX : game.coins.playerO
+      if (playerCoins < 1) {
+        console.log(`[BUY] Not enough coins. Have=${playerCoins}, Need=1`)
+        socket.emit('buy-failed', { reason: 'moedas' })
+        return
+      }
+
+      // Check if mode is valid
+      const opponent = player.symbol === 'X' ? 'O' : 'X'
+      let hasOpponentCells = false
+      let hasAnyCells = false
+
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          const cellLeft = game.boardLeft[row][col]
+          const cellRight = game.boardRight[row][col]
+
+          if (cellLeft === opponent || cellRight === opponent) {
+            hasOpponentCells = true
+          }
+          if (cellLeft !== null || cellRight !== null) {
+            hasAnyCells = true
+          }
+        }
+      }
+
+      if (mode === 'steal' && !hasOpponentCells) {
+        console.log(`[BUY] Cannot buy steal mode - no opponent cells`)
+        socket.emit('buy-failed', { reason: 'sem-oponente' })
+        return
+      }
+      if (mode === 'clear' && !hasOpponentCells) {
+        console.log(`[BUY] Cannot buy clear mode - no opponent cells`)
+        socket.emit('buy-failed', { reason: 'sem-oponente' })
+        return
+      }
+      if (mode === 'invert') {
+        const hasX = [...game.boardLeft, ...game.boardRight].flat().some(c => c === 'X')
+        const hasO = [...game.boardLeft, ...game.boardRight].flat().some(c => c === 'O')
+        if (!hasX || !hasO) {
+          console.log(`[BUY] Cannot buy invert mode - need both X and O`)
+          socket.emit('buy-failed', { reason: 'sem-marca' })
+          return
+        }
+      }
+
+      // Restore mode - only after opponent used clear, costs 2 coins
+      if (mode === 'restore') {
+        if (playerCoins < 2) {
+          console.log(`[BUY] Not enough coins for restore mode. Have=${playerCoins}, Need=2`)
+          socket.emit('buy-failed', { reason: 'moedas' })
+          return
+        }
+        if (!game.lastClearBy || game.lastClearBy === player.symbol) {
+          console.log(`[BUY] Cannot buy restore mode - opponent hasn't used clear`)
+          socket.emit('buy-failed', { reason: 'sem-limpar' })
+          return
+        }
+      }
+
+      // Deduct coin(s)
+      const cost = mode === 'restore' ? 2 : 1
+      if (player.symbol === 'X') {
+        game.coins.playerX -= cost
+      } else {
+        game.coins.playerO -= cost
+      }
+
+      // Apply mode
+      game.stealMode = false
+      game.clearMode = false
+      game.inversionMode = false
+
+      if (mode === 'steal') {
+        game.stealMode = true
+      } else if (mode === 'clear') {
+        game.clearMode = true
+        game.lastClearBy = player.symbol
+      } else if (mode === 'invert') {
+        game.inversionMode = true
+        game.inversionModeBought = true
+      } else if (mode === 'restore') {
+        game.restoreMode = true
+      }
+
+      console.log(`[BUY] Mode activated: ${mode}, remaining coins: X=${game.coins.playerX} O=${game.coins.playerO}`)
+
+      io.to(roomId.toUpperCase()).emit('mode-bought', {
+        mode: mode,
+        currentPlayer: game.currentPlayer,
+        coins: game.coins,
+        stealMode: game.stealMode,
+        clearMode: game.clearMode,
+        inversionMode: game.inversionMode,
+        restoreMode: game.restoreMode,
+      })
+    })
+
+    // Cancel mode (when player doesn't want to use steal/clear/invert)
+    socket.on('cancel-mode', (roomId) => {
+      console.log(`[CANCEL] Request: room=${roomId}, socket=${socket.id}`)
+
+      const game = games.get(roomId.toUpperCase())
+      if (!game) {
+        console.log(`[CANCEL] Room ${roomId} not found`)
+        return
+      }
+      if (!game.gameStarted || game.isRolling || game.winner) {
+        console.log(`[CANCEL] Game not in valid state`)
+        return
+      }
+
+      const player = Array.from(game.players.values()).find(p => p.socketId === socket.id)
+      if (!player || player.symbol !== game.currentPlayer) {
+        console.log(`[CANCEL] Not player's turn`)
+        return
+      }
+
+      // Only allow cancel if a special mode is active
+      if (!game.stealMode && !game.clearMode && !game.inversionMode) {
+        console.log(`[CANCEL] No active mode to cancel`)
+        return
+      }
+
+      console.log(`[CANCEL] Player ${game.currentPlayer} cancelled ${game.stealMode ? 'steal' : game.clearMode ? 'clear' : 'inversion'} mode`)
+
+      // Refund coin if mode was bought (not from dice)
+      // Note: We need to track if mode was bought. For now, let's not refund.
+      // The player just loses the turn.
+
+      // Reset modes
+      game.stealMode = false
+      game.clearMode = false
+      game.inversionMode = false
+
+      // Switch turn
+      game.currentPlayer = game.currentPlayer === 'X' ? 'O' : 'X'
+      game.allowedColumn = null
+
+      io.to(roomId.toUpperCase()).emit('mode-cancelled', {
+        currentPlayer: game.currentPlayer,
+        stealMode: false,
+        clearMode: false,
+        inversionMode: false,
+      })
+    })
+
     // Handle cell click
     socket.on('cell-click', (data) => {
       const game = games.get(data.roomId.toUpperCase())
@@ -562,7 +750,25 @@ app.prepare().then(() => {
           } else {
             game.score.playerO++
           }
-          console.log(`[WIN] Player ${game.currentPlayer} won! Score: X=${game.score.playerX} O=${game.score.playerO}`)
+
+          // Award coin every 3 wins
+          if (game.currentPlayer === 'X') {
+            game.winStreak.playerX++
+            if (game.winStreak.playerX >= 3) {
+              game.coins.playerX++
+              game.winStreak.playerX = 0
+              console.log(`[COIN] Player X earned a coin! Total: ${game.coins.playerX}`)
+            }
+          } else {
+            game.winStreak.playerO++
+            if (game.winStreak.playerO >= 3) {
+              game.coins.playerO++
+              game.winStreak.playerO = 0
+              console.log(`[COIN] Player O earned a coin! Total: ${game.coins.playerO}`)
+            }
+          }
+
+          console.log(`[WIN] Player ${game.currentPlayer} won! Score: X=${game.score.playerX} O=${game.score.playerO}, Coins: X=${game.coins.playerX} O=${game.coins.playerO}`)
         } else {
           game.currentPlayer = game.currentPlayer === 'X' ? 'O' : 'X'
           game.stealMode = false
@@ -577,7 +783,8 @@ app.prepare().then(() => {
           winner: game.winner,
           boardLeft: game.boardLeft,
           boardRight: game.boardRight,
-          score: game.score, // Include score
+          score: game.score,
+          coins: game.coins,
           playSound: true, // Flag to play sound for all players
         })
         return
@@ -613,7 +820,25 @@ app.prepare().then(() => {
         } else {
           game.score.playerO++
         }
-        console.log(`[WIN] Player ${game.currentPlayer} won! Score: X=${game.score.playerX} O=${game.score.playerO}`)
+
+        // Award coin every 3 wins
+        if (game.currentPlayer === 'X') {
+          game.winStreak.playerX++
+          if (game.winStreak.playerX >= 3) {
+            game.coins.playerX++
+            game.winStreak.playerX = 0
+            console.log(`[COIN] Player X earned a coin! Total: ${game.coins.playerX}`)
+          }
+        } else {
+          game.winStreak.playerO++
+          if (game.winStreak.playerO >= 3) {
+            game.coins.playerO++
+            game.winStreak.playerO = 0
+            console.log(`[COIN] Player O earned a coin! Total: ${game.coins.playerO}`)
+          }
+        }
+
+        console.log(`[WIN] Player ${game.currentPlayer} won! Score: X=${game.score.playerX} O=${game.score.playerO}, Coins: X=${game.coins.playerX} O=${game.coins.playerO}`)
       } else {
         game.currentPlayer = game.currentPlayer === 'X' ? 'O' : 'X'
         game.allowedColumn = null
@@ -628,7 +853,8 @@ app.prepare().then(() => {
         winner: game.winner,
         boardLeft: game.boardLeft,
         boardRight: game.boardRight,
-        score: game.score, // Include score
+        score: game.score,
+        coins: game.coins,
         playSound: true, // Flag to play sound for all players
       })
     })
@@ -641,8 +867,9 @@ app.prepare().then(() => {
       const player = Array.from(game.players.values()).find(p => p.socketId === socket.id)
       if (!player || player.symbol !== game.currentPlayer) return
 
-      // Only allow inversion when dice is 8
-      if (!game.inversionMode || game.diceValue !== 8) return
+      // Only allow inversion when dice is 8 OR when mode was bought with coin
+      if (!game.inversionMode) return
+      if (game.diceValue !== 8 && !game.inversionModeBought) return
 
       // Invert all marks on both boards
       const invertBoard = (board) =>
@@ -660,6 +887,7 @@ app.prepare().then(() => {
       // Switch turn
       game.currentPlayer = game.currentPlayer === 'X' ? 'O' : 'X'
       game.inversionMode = false
+      game.inversionModeBought = false
       game.allowedColumn = null
 
       io.to(data.roomId.toUpperCase()).emit('marks-inverted', {
@@ -674,13 +902,20 @@ app.prepare().then(() => {
     socket.on('clear-board', (data) => {
       const game = games.get(data.roomId.toUpperCase())
       if (!game || !game.gameStarted || game.isRolling || game.winner) return
-      
+
       const player = Array.from(game.players.values()).find(p => p.socketId === socket.id)
       if (!player || player.symbol !== game.currentPlayer) return
-      
-      // Only allow clear mode when dice is 7
-      if (!game.clearMode || game.diceValue !== 7) return
-      
+
+      // Only allow clear mode when clearMode is active (dice=7 OR bought with coin)
+      if (!game.clearMode) return
+
+      // Save board state before clearing for restore mode
+      game.boardBeforeClear = {
+        boardLeft: game.boardLeft.map(row => [...row]),
+        boardRight: game.boardRight.map(row => [...row]),
+      }
+      game.lastClearBy = player.symbol
+
       // Clear the chosen board
       if (data.boardSide === 'left') {
         game.boardLeft = Array(3).fill(null).map(() => Array(3).fill(null))
@@ -702,6 +937,39 @@ app.prepare().then(() => {
         boardRight: game.boardRight,
         playSound: true,
       })
+    })
+
+    // Restore board (restore mode)
+    socket.on('restore-board', (data) => {
+      const { roomId } = data
+      const game = games.get(roomId.toUpperCase())
+      if (!game || !game.gameStarted || game.isRolling || game.winner) return
+
+      const player = Array.from(game.players.values()).find(p => p.socketId === socket.id)
+      if (!player || player.symbol !== game.currentPlayer) return
+
+      // Only allow restore mode when restoreMode is active
+      if (!game.restoreMode) return
+
+      // Restore board to state before clear
+      if (game.boardBeforeClear) {
+        game.boardLeft = game.boardBeforeClear.boardLeft.map(row => [...row])
+        game.boardRight = game.boardBeforeClear.boardRight.map(row => [...row])
+
+        console.log(`[RESTORE] Player ${game.currentPlayer} restored board`)
+
+        // Switch turn
+        game.currentPlayer = game.currentPlayer === 'X' ? 'O' : 'X'
+        game.restoreMode = false
+        game.allowedColumn = null
+
+        io.to(roomId.toUpperCase()).emit('board-restored', {
+          currentPlayer: game.currentPlayer,
+          boardLeft: game.boardLeft,
+          boardRight: game.boardRight,
+          playSound: true,
+        })
+      }
     })
 
     // Reset game
@@ -735,6 +1003,7 @@ app.prepare().then(() => {
         boardLeft: game.boardLeft,
         boardRight: game.boardRight,
         currentPlayer: game.currentPlayer,
+        coins: game.coins,
       })
     })
 
