@@ -26,6 +26,7 @@ export default function GamePage() {
     joinRoom,
     joinAsCreator,
     rejoinRoom,
+    socketRef,
   } = useSocket()
 
   const { playDiceRoll, playWin, playSteal, playClear, playColumnFull } = useSound()
@@ -94,8 +95,8 @@ export default function GamePage() {
   // Join room when entering game page
   useEffect(() => {
     const savedSymbol = localStorage.getItem('playerSymbol')
-    
-    // If we have a saved symbol for this room
+
+    // If we have a saved symbol for this room, try to rejoin
     if (savedSymbol && roomId) {
       // Creator (X) needs to rejoin via socket
       if (savedSymbol === 'X' && isConnected && !joined) {
@@ -106,7 +107,7 @@ export default function GamePage() {
         })
         return
       }
-      
+
       // Player 2 (O) needs to rejoin via socket too
       if (savedSymbol === 'O' && isConnected && !joined) {
         rejoinRoom(roomId, (success) => {
@@ -117,8 +118,9 @@ export default function GamePage() {
         return
       }
     }
-    
-    // Otherwise try to join (this is the second player without saved symbol)
+
+    // No saved symbol - try to join as second player automatically
+    // This handles the case where both players open the same link
     if (roomId && isConnected && !joined && playerName) {
       joinRoom(roomId, playerName, (success) => {
         if (success) {
@@ -185,11 +187,20 @@ export default function GamePage() {
   // Play clear sound when clear mode activates (dice = 7)
   useEffect(() => {
     if (!mounted) return
-    
+
     if (gameState.clearMode && gameState.diceValue === 7) {
       playClear()
     }
   }, [gameState.clearMode, gameState.diceValue, mounted, playClear])
+
+  // Play inversion sound when inversion mode activates (dice = 8)
+  useEffect(() => {
+    if (!mounted) return
+
+    if (gameState.inversionMode && gameState.diceValue === 8) {
+      playSteal() // Reuse steal sound for inversion
+    }
+  }, [gameState.inversionMode, gameState.diceValue, mounted, playSteal])
 
   // Play column full sound when column is full
   useEffect(() => {
@@ -339,17 +350,22 @@ export default function GamePage() {
                 currentPlayer={gameState.currentPlayer}
                 allowedColumn={gameState.allowedColumn}
                 onCellClick={(row, col) => {
-                  if (gameState.clearMode) {
+                  if (gameState.inversionMode) {
+                    // Inversion mode - swap all marks
+                    // Emit event to server to handle inversion
+                    socketRef.current?.emit('invert-marks', { roomId })
+                  } else if (gameState.clearMode) {
                     clearBoard('left')
                   } else {
                     cellClick('left', row, col)
                   }
                 }}
                 playerName="1-3"
-                isActive={isMyTurn && (leftBoardActive || gameState.stealMode || gameState.clearMode)}
+                isActive={isMyTurn && (leftBoardActive || gameState.stealMode || gameState.clearMode || gameState.inversionMode)}
                 diceStart={1}
                 stealMode={gameState.stealMode}
                 clearMode={gameState.clearMode}
+                inversionMode={gameState.inversionMode}
               />
             </div>
 
@@ -359,17 +375,20 @@ export default function GamePage() {
                 currentPlayer={gameState.currentPlayer}
                 allowedColumn={gameState.allowedColumn}
                 onCellClick={(row, col) => {
-                  if (gameState.clearMode) {
+                  if (gameState.inversionMode) {
+                    socketRef.current?.emit('invert-marks', { roomId })
+                  } else if (gameState.clearMode) {
                     clearBoard('right')
                   } else {
                     cellClick('right', row, col)
                   }
                 }}
                 playerName="4-6"
-                isActive={isMyTurn && (rightBoardActive || gameState.stealMode || gameState.clearMode)}
+                isActive={isMyTurn && (rightBoardActive || gameState.stealMode || gameState.clearMode || gameState.inversionMode)}
                 diceStart={4}
                 stealMode={gameState.stealMode}
                 clearMode={gameState.clearMode}
+                inversionMode={gameState.inversionMode}
               />
             </div>
           </div>

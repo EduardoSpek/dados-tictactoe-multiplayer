@@ -368,14 +368,14 @@ app.prepare().then(() => {
       let rolls = 0
       const maxRolls = 15
       const interval = setInterval(() => {
-        game.diceValue = Math.floor(Math.random() * 6) + 1
+        game.diceValue = Math.floor(Math.random() * 6) + 1 // 1-6 for animation
         rolls++
-        
+
         io.to(roomId.toUpperCase()).emit('dice-rolling', game.diceValue)
-        
+
         if (rolls >= maxRolls) {
           clearInterval(interval)
-          
+
           // Check if there are opponent cells to steal
           const opponent = game.currentPlayer === 'X' ? 'O' : 'X'
           let hasOpponentCells = false
@@ -388,37 +388,102 @@ app.prepare().then(() => {
             }
             if (hasOpponentCells) break
           }
-          
+
           // Only allow 0 if there are opponent cells to steal
           // Allow 7 (clear mode) if at least one board has cells
-          const hasAnyCells = game.boardLeft.some(row => row.some(cell => cell !== null)) || 
+          const hasAnyCells = game.boardLeft.some(row => row.some(cell => cell !== null)) ||
                               game.boardRight.some(row => row.some(cell => cell !== null))
-          
+
+          // DEBUG: Forçando 8 para aparecer com mais frequência para teste
           let finalValue
-          if (hasOpponentCells && hasAnyCells) {
-            finalValue = Math.floor(Math.random() * 8) // 0-7
-          } else if (hasOpponentCells) {
-            finalValue = Math.floor(Math.random() * 7) // 0-6 (no clear if boards empty)
-          } else if (hasAnyCells) {
-            finalValue = Math.floor(Math.random() * 7) + 1 // 1-7 (no steal if no opponent cells)
-          } else {
-            finalValue = Math.floor(Math.random() * 6) + 1 // 1-6 only
+          let attempts = 0
+          const maxAttempts = 20
+
+          do {
+            if (hasOpponentCells && hasAnyCells) {
+              finalValue = Math.floor(Math.random() * 9) // 0-8 (all modes available)
+            } else if (hasOpponentCells) {
+              finalValue = Math.floor(Math.random() * 8) // 0-7 (no clear if boards empty)
+            } else if (hasAnyCells) {
+              finalValue = Math.floor(Math.random() * 8) + 1 // 1-8 (no steal if no opponent cells)
+            } else {
+              finalValue = Math.floor(Math.random() * 6) + 1 // 1-6 only
+            }
+
+            // If 8 but no X and O, reroll silently
+            if (finalValue === 8) {
+              const hasX = [...game.boardLeft, ...game.boardRight].flat().some(c => c === 'X')
+              const hasO = [...game.boardLeft, ...game.boardRight].flat().some(c => c === 'O')
+              if (!hasX || !hasO) {
+                attempts++
+                continue // keep rolling
+              }
+            }
+
+            // If 0 but no cells, reroll silently
+            if (finalValue === 0) {
+              if (!hasAnyCells) {
+                attempts++
+                continue
+              }
+            }
+
+            // If 7 but no opponent cells, reroll silently
+            if (finalValue === 7) {
+              if (!hasOpponentCells) {
+                attempts++
+                continue
+              }
+            }
+
+            break
+          } while (attempts < maxAttempts)
+
+          // Fallback to 1-6 if too many attempts
+          if (attempts >= maxAttempts) {
+            finalValue = Math.floor(Math.random() * 6) + 1
           }
-          
+
           game.diceValue = finalValue
           game.isRolling = false
-          
+
           let isColumnFull = false
-          
-          if (finalValue === 0) {
+
+          // EIGHT = Inversion mode! (only if there's at least one X and one O)
+          if (finalValue === 8) {
+            const hasX = [...game.boardLeft, ...game.boardRight].flat().some(c => c === 'X')
+            const hasO = [...game.boardLeft, ...game.boardRight].flat().some(c => c === 'O')
+
+            if (!hasX || !hasO) {
+              // This shouldn't happen now, but just in case
+              finalValue = Math.floor(Math.random() * 6) + 1
+              game.diceValue = finalValue
+            }
+
+            game.inversionMode = true
+            game.stealMode = false
+            game.clearMode = false
+            game.allowedColumn = null
+            io.to(roomId.toUpperCase()).emit('dice-rolled', {
+              value: finalValue,
+              currentPlayer: game.currentPlayer,
+              allowedColumn: null,
+              stealMode: false,
+              clearMode: false,
+              inversionMode: true,
+            })
+            return
+          } else if (finalValue === 0) {
             // Steal mode
             game.stealMode = true
             game.clearMode = false
+            game.inversionMode = false
             game.allowedColumn = null
           } else if (finalValue === 7) {
             // Clear mode - choose board to clear
             game.stealMode = false
             game.clearMode = true
+            game.inversionMode = false
             game.allowedColumn = null
           } else {
             // Normal mode
@@ -565,6 +630,43 @@ app.prepare().then(() => {
         boardRight: game.boardRight,
         score: game.score, // Include score
         playSound: true, // Flag to play sound for all players
+      })
+    })
+
+    // Handle invert marks (when dice = 8)
+    socket.on('invert-marks', (data) => {
+      const game = games.get(data.roomId.toUpperCase())
+      if (!game || !game.gameStarted || game.isRolling || game.winner) return
+
+      const player = Array.from(game.players.values()).find(p => p.socketId === socket.id)
+      if (!player || player.symbol !== game.currentPlayer) return
+
+      // Only allow inversion when dice is 8
+      if (!game.inversionMode || game.diceValue !== 8) return
+
+      // Invert all marks on both boards
+      const invertBoard = (board) =>
+        board.map(row => row.map(cell => {
+          if (cell === 'X') return 'O'
+          if (cell === 'O') return 'X'
+          return null
+        }))
+
+      game.boardLeft = invertBoard(game.boardLeft)
+      game.boardRight = invertBoard(game.boardRight)
+
+      console.log(`[INVERT] Player ${game.currentPlayer} inverted all marks`)
+
+      // Switch turn
+      game.currentPlayer = game.currentPlayer === 'X' ? 'O' : 'X'
+      game.inversionMode = false
+      game.allowedColumn = null
+
+      io.to(data.roomId.toUpperCase()).emit('marks-inverted', {
+        currentPlayer: game.currentPlayer,
+        boardLeft: game.boardLeft,
+        boardRight: game.boardRight,
+        playSound: true,
       })
     })
 

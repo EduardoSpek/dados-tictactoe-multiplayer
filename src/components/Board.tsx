@@ -12,9 +12,10 @@ interface BoardProps {
   diceStart: number
   stealMode?: boolean
   clearMode?: boolean
+  inversionMode?: boolean
 }
 
-export default function Board({ board, currentPlayer, allowedColumn, onCellClick, playerName, isActive, diceStart, stealMode = false, clearMode = false }: BoardProps) {
+export default function Board({ board, currentPlayer, allowedColumn, onCellClick, playerName, isActive, diceStart, stealMode = false, clearMode = false, inversionMode = false }: BoardProps) {
   const getCellClasses = (row: number, col: number, value: string | null) => {
     const actualCol = diceStart === 4 ? col + 3 : col
     const opponent = currentPlayer === 'X' ? 'O' : 'X'
@@ -22,7 +23,7 @@ export default function Board({ board, currentPlayer, allowedColumn, onCellClick
     const isAllowed = allowedColumn === actualCol && value === null
     const isStealable = stealMode && isOpponentCell
     const isDisabled = !stealMode && allowedColumn !== null && allowedColumn !== actualCol
-    
+
     let baseClasses = `
       w-full aspect-square
       flex items-center justify-center
@@ -31,10 +32,13 @@ export default function Board({ board, currentPlayer, allowedColumn, onCellClick
       transition-all duration-200
       border-2
     `
-    
+
     if (clearMode && isActive) {
       // Clear mode styling - entire board is clickable
       baseClasses += ' bg-red-300 dark:bg-red-800 border-red-500 dark:border-red-400 text-red-800 dark:text-red-200 shadow-inner cursor-pointer hover:bg-red-400 dark:hover:bg-red-700 animate-pulse'
+    } else if (inversionMode && isActive) {
+      // Inversion mode styling - entire board is clickable and pulsing
+      baseClasses += ' bg-purple-300 dark:bg-purple-800 border-purple-500 dark:border-purple-400 text-purple-800 dark:text-purple-200 shadow-inner cursor-pointer hover:bg-purple-400 dark:hover:bg-purple-700 animate-pulse'
     } else if (value === 'X') {
       if (isStealable) {
         baseClasses += ' bg-red-300 dark:bg-red-800 border-red-600 dark:border-red-400 text-red-800 dark:text-red-200 shadow-inner cursor-pointer hover:bg-red-400 dark:hover:bg-red-700 animate-pulse'
@@ -54,7 +58,7 @@ export default function Board({ board, currentPlayer, allowedColumn, onCellClick
     } else {
       baseClasses += ' bg-white dark:bg-gray-800 border-gray-400 dark:border-gray-500 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 hover:shadow-md'
     }
-    
+
     return baseClasses
   }
 
@@ -72,14 +76,14 @@ export default function Board({ board, currentPlayer, allowedColumn, onCellClick
       <div className="grid grid-cols-3 gap-1 sm:gap-2 mb-2">
         {board.map((row, rowIndex) => (
           row.map((cell, colIndex) => (
-       <button
-               key={`${rowIndex}-${colIndex}`}
-               type="button"
-               onClick={() => onCellClick(rowIndex, colIndex)}
-               disabled={!stealMode && !clearMode && (!isActive || cell !== null)}
-               className={getCellClasses(rowIndex, colIndex, cell)}
-             >
-              {cell}
+        <button
+                key={`${rowIndex}-${colIndex}`}
+                type="button"
+                onClick={() => onCellClick(rowIndex, colIndex)}
+                disabled={!stealMode && !clearMode && !inversionMode && (!isActive || cell !== null)}
+                className={getCellClasses(rowIndex, colIndex, cell)}
+              >
+               {cell}
             </button>
           ))
         ))}

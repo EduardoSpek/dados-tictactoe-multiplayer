@@ -22,14 +22,16 @@ export default function Lobby() {
       setError('Conectando ao servidor...')
       return
     }
-    
+
     localStorage.setItem('playerName', playerName.trim())
-    
+
     setIsCreating(true)
     setError(null)
-    
+
     createRoom(playerName, (roomId) => {
       setIsCreating(false)
+      // Copy room code to clipboard
+      navigator.clipboard.writeText(roomId)
       // Go directly to game page
       router.push(`/game?room=${roomId}`)
     })

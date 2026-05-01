@@ -51,6 +51,7 @@ interface GameState {
   winner: string | null
   stealMode: boolean
   clearMode: boolean
+  inversionMode: boolean
   gameStarted: boolean
   score: { playerX: number; playerO: number }
   columnFull: boolean
@@ -84,6 +85,7 @@ export function useSocket() {
     winner: null,
     stealMode: false,
     clearMode: false,
+    inversionMode: false,
     gameStarted: false,
     score: { playerX: 0, playerO: 0 },
     columnFull: false,
@@ -182,6 +184,7 @@ export function useSocket() {
       winner: string | null
       stealMode: boolean
       clearMode?: boolean
+      inversionMode?: boolean
     }) => {
       console.log('Sync game state:', data)
       setGameState(prev => ({
@@ -194,6 +197,7 @@ export function useSocket() {
         winner: data.winner,
         stealMode: data.stealMode,
         clearMode: data.clearMode || false,
+        inversionMode: data.inversionMode || false,
         gameStarted: true,
       }))
     })
@@ -208,6 +212,7 @@ export function useSocket() {
       allowedColumn: number | null
       stealMode: boolean
       clearMode?: boolean
+      inversionMode?: boolean
       columnFull?: boolean
     }) => {
       setGameState(prev => ({
@@ -217,6 +222,7 @@ export function useSocket() {
         allowedColumn: data.allowedColumn,
         stealMode: data.stealMode,
         clearMode: data.clearMode || false,
+        inversionMode: data.inversionMode || false,
         isRolling: false,
         columnFull: data.columnFull || false,
       }))
@@ -297,6 +303,28 @@ export function useSocket() {
         currentPlayer: data.currentPlayer,
         stealMode: false,
         clearMode: false,
+        allowedColumn: null,
+      }))
+    })
+
+    socket.on('marks-inverted', (data: {
+      currentPlayer: 'X' | 'O'
+      boardLeft: (string | null)[][]
+      boardRight: (string | null)[][]
+      playSound?: boolean
+    }) => {
+      // Play sound if server sent playSound flag
+      if (data.playSound) {
+        playPlaceMarkSound()
+      }
+      setGameState(prev => ({
+        ...prev,
+        boardLeft: data.boardLeft,
+        boardRight: data.boardRight,
+        currentPlayer: data.currentPlayer,
+        stealMode: false,
+        clearMode: false,
+        inversionMode: false,
         allowedColumn: null,
       }))
     })
@@ -433,5 +461,6 @@ export function useSocket() {
     clearBoard,
     resetGame,
     sendReaction,
+    socketRef,
   }
 }

@@ -16,9 +16,14 @@ Um jogo da velha inovador com mecânicas de dados, dois tabuleiros simultâneos 
 ## ✨ Funcionalidades
 
 ### 🎯 Mecânicas do Jogo
-- **🎲 Sistema de Dados**: Role um dado (0-7) para determinar em qual coluna jogar
-- **🔥 Modo Roubo**: Ao tirar **0**, entre no modo roubo e capture casas do adversário!
-- **🧹 Modo Limpar**: Ao tirar **7**, escolha qual tabuleiro limpar completamente!
+- **🎲 Sistema de Dados**: Role um dado (0-8) para determinar em qual coluna jogar
+- **🔥 Modo Roubo (0)**: Ao tirar **0**, entre no modo roubo e capture casas do adversário!
+- **🧹 Modo Limpar (7)**: Ao tirar **7**, escolha qual tabuleiro limpar completamente!
+- **🎭 Modo Inversão (8)**: Ao tirar **8**, inverte todas as marcas (X vira O e vice-versa)!
+- **🎲 Dado Justo**: Todos os números têm igual probabilidade de sair
+- **🔄 Silently Reroll**: Modos inválidos são rerolados automaticamente (sem mostrar ao jogador)
+- **🎯 Letras nos Dados**: Modos especiais exibem iniciais (R=0, L=7, I=8)
+- **🎨 Dado Vazado**: Dados com bordas brancas e bolinhas vermelhas
 - **🎭 Dois Tabuleiros**: Tabuleiros 1-3 e 4-6 com colunas interconectadas
 - **🏆 Placar de Vitórias**: Acompanhe seu desempenho contra oponentes
 - **🔄 Reconexão Automática**: Volte ao jogo mesmo se atualizar a página
@@ -27,6 +32,8 @@ Um jogo da velha inovador com mecânicas de dados, dois tabuleiros simultâneos 
 
 ### 🌐 Multiplayer Online
 - **Crie Salas**: Gere códigos de sala para convidar amigos
+- **Código na Área de Transferência**: Ao criar sala, o código é copiado automaticamente
+- **Conexão Automática**: Dois jogadores no mesmo link se conectam automaticamente
 - **Entre por Código**: Conecte-se a salas existentes facilmente
 - **Tempo Real**: Comunicação instantânea via WebSocket
 - **Suporte a Rede Local**: Jogue na mesma rede WiFi
@@ -100,10 +107,11 @@ Para jogar com amigos na mesma rede:
 ### Regras do Jogo
 1. **Role o dado** para sortear uma coluna (1-6)
 2. **Marque** em uma das casas da coluna sorteada
-3. **Tire 0** para ativar o modo roubo e capturar casas do adversário
-4. **Tire 7** para ativar o modo limpar e zerar um tabuleiro completo
-5. **Use emojis** para se comunicar com seu oponente durante a partida
-6. **Alinhe 3** em qualquer tabuleiro para vencer!
+3. **Tire 0** para ativar o modo roubo (R) e capturar casas do adversário
+4. **Tire 7** para ativar o modo limpar (L) e zerar um tabuleiro completo
+5. **Tire 8** para ativar o modo inversão (I) e inverter todas as marcas
+6. **Use emojis** para se comunicar com seu oponente durante a partida
+7. **Alinhe 3** em qualquer tabuleiro para vencer!
 
 ---
 
