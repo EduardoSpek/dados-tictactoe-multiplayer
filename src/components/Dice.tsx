@@ -99,20 +99,24 @@ export default function Dice({ value, size = 'md', isRolling = false, onClick, d
       <div
         onClick={() => !disabled && onClick?.()}
         className={`
-          ${sizeClasses[size]} 
+          ${sizeClasses[size]}
           ${diceBg}
-          rounded-xl 
-          shadow-lg 
-          border-2 
+          rounded-xl
+          shadow-lg
+          border-2
           ${borderColor}
-          flex 
-          items-center 
+          flex
+          items-center
           justify-center
           cursor-pointer
           transition-transform
           ${!disabled && !isRolling ? 'hover:scale-105 active:scale-95' : ''}
           ${disabled || isRolling ? 'opacity-60 cursor-not-allowed' : ''}
+          ${isRolling ? 'animate-spin' : ''}
         `}
+        style={isRolling ? {
+          animation: 'spin 0.5s linear infinite',
+        } : undefined}
       >
         {displayValue && displayValue >= 1 && displayValue <= 6 ? (
           <div className={`grid grid-cols-3 gap-0.5 ${sizeClasses[size]} p-1`}>
