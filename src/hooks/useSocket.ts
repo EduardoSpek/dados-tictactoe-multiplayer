@@ -57,6 +57,7 @@ interface GameState {
   score: { playerX: number; playerO: number }
   coins: { playerX: number; playerO: number }
   columnFull: boolean
+  turnTimeLeft: number
 }
 
 interface Player {
@@ -93,6 +94,7 @@ export function useSocket() {
     score: { playerX: 0, playerO: 0 },
     coins: { playerX: 0, playerO: 0 },
     columnFull: false,
+    turnTimeLeft: 10,
   })
   const [error, setError] = useState<string | null>(null)
 
@@ -393,6 +395,23 @@ export function useSocket() {
       setError(null) // Clear error when opponent reconnects
     })
 
+    // Turn timer events
+    socket.on('turn-timer', (data: { timeLeft: number; currentPlayer: 'X' | 'O' }) => {
+      setGameState(prev => ({
+        ...prev,
+        turnTimeLeft: data.timeLeft,
+      }))
+    })
+
+    socket.on('turn-expired', (data: { previousPlayer: 'X' | 'O'; newCurrentPlayer: 'X' | 'O' }) => {
+      console.log('Turn expired:', data)
+      setGameState(prev => ({
+        ...prev,
+        currentPlayer: data.newCurrentPlayer,
+        turnTimeLeft: 10,
+      }))
+    })
+
     // Listen for mode bought
     socket.on('mode-bought', (data: {
       mode: string
@@ -512,6 +531,8 @@ export function useSocket() {
 
   const cellClick = useCallback((boardSide: 'left' | 'right', row: number, col: number) => {
     if (!socketRef.current || !roomId) return
+    // Stop turn timer when player makes a move
+    socketRef.current.emit('stop-turn-timer', roomId)
     socketRef.current.emit('cell-click', { roomId, boardSide, row, col })
   }, [roomId])
 
@@ -555,6 +576,16 @@ export function useSocket() {
     socketRef.current.emit('send-reaction', { roomId, emoji })
   }, [roomId])
 
+  const startTurnTimer = useCallback(() => {
+    if (!socketRef.current || !roomId) return
+    socketRef.current.emit('start-turn-timer', roomId)
+  }, [roomId])
+
+  const stopTurnTimer = useCallback(() => {
+    if (!socketRef.current || !roomId) return
+    socketRef.current.emit('stop-turn-timer', roomId)
+  }, [roomId])
+
   return {
     isConnected,
     roomId,
@@ -574,6 +605,8 @@ export function useSocket() {
     restoreBoard,
     resetGame,
     sendReaction,
+    startTurnTimer,
+    stopTurnTimer,
     socketRef,
   }
 }

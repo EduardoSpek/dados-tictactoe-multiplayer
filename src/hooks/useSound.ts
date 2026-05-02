@@ -158,6 +158,35 @@ const useSound = () => {
     }
   }, [])
 
+  // Turn expired sound - alert when timer runs out
+  const playTurnExpired = useCallback(() => {
+    try {
+      const ctx = getAudioContext()
+      // Three beeps for alert
+      const notes = [400, 300, 200]
+
+      notes.forEach((freq, index) => {
+        setTimeout(() => {
+          const oscillator = ctx.createOscillator()
+          const gainNode = ctx.createGain()
+          oscillator.connect(gainNode)
+          gainNode.connect(ctx.destination)
+
+          oscillator.frequency.value = freq
+          oscillator.type = 'square'
+
+          gainNode.gain.setValueAtTime(0.2, ctx.currentTime)
+          gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2)
+
+          oscillator.start(ctx.currentTime)
+          oscillator.stop(ctx.currentTime + 0.2)
+        }, index * 200)
+      })
+    } catch (e) {
+      console.log('Audio not supported')
+    }
+  }, [])
+
   return {
     playDiceRoll,
     playPlaceMark,
@@ -165,7 +194,8 @@ const useSound = () => {
     playColumnFull,
     playClick,
     playSteal,
-    playClear
+    playClear,
+    playTurnExpired
   }
 }
 

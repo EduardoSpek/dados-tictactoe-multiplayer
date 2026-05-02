@@ -29,10 +29,11 @@ export default function GamePage() {
     joinRoom,
     joinAsCreator,
     rejoinRoom,
+    startTurnTimer,
     socketRef,
   } = useSocket()
 
-  const { playDiceRoll, playWin, playSteal, playClear, playColumnFull } = useSound()
+  const { playDiceRoll, playWin, playSteal, playClear, playColumnFull, playTurnExpired } = useSound()
 
   const [mounted, setMounted] = useState(false)
   const [joined, setJoined] = useState(false)
@@ -208,11 +209,34 @@ export default function GamePage() {
   // Play column full sound when column is full
   useEffect(() => {
     if (!mounted) return
-    
+
     if (gameState.columnFull) {
       playColumnFull()
     }
   }, [gameState.columnFull, mounted, playColumnFull])
+
+  // Turn timer effect
+  useEffect(() => {
+    if (!mounted || !roomId) return
+
+    // Start timer when game starts
+    if (gameState.gameStarted && players.length === 2) {
+      startTurnTimer()
+    }
+
+    // Restart timer when turn changes
+    if (gameState.gameStarted && players.length === 2) {
+      startTurnTimer()
+    }
+  }, [gameState.gameStarted, gameState.currentPlayer, players.length, mounted, roomId, startTurnTimer])
+
+  // Play sound when timer expires
+  useEffect(() => {
+    if (!mounted) return
+    if (gameState.turnTimeLeft === 0) {
+      playTurnExpired()
+    }
+  }, [gameState.turnTimeLeft, mounted, playTurnExpired])
 
   if (!mounted) {
     return (
@@ -483,6 +507,12 @@ export default function GamePage() {
               {/* Reaction Button Area - 20% */}
               {gameState.gameStarted && players.length === 2 && (
                 <div className="flex-[0.2] flex flex-col items-center justify-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl border-2 border-gray-300 dark:border-gray-700 p-2">
+                  {/* Turn Timer */}
+                  {gameState.currentPlayer === playerSymbol && (
+                    <div className={`text-3xl font-bold ${gameState.turnTimeLeft <= 3 ? 'text-red-600 animate-pulse' : 'text-white'}`}>
+                      {gameState.turnTimeLeft}
+                    </div>
+                  )}
                   <ReactionButton
                     ref={reactionButtonRef}
                     onReaction={handleSendReaction}

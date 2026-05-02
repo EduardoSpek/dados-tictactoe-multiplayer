@@ -70,6 +70,8 @@ app.prepare().then(() => {
         score: { playerX: 0, playerO: 0 },
         coins: { playerX: 0, playerO: 0 },
         winStreak: { playerX: 0, playerO: 0 },
+        turnTimeLeft: 15,
+        turnTimer: null,
       }
       
       // Add creator as first player (X)
@@ -1059,12 +1061,12 @@ app.prepare().then(() => {
       const { roomId, emoji } = data
       const game = games.get(roomId.toUpperCase())
       if (!game) return
-      
+
       const player = Array.from(game.players.values()).find(p => p.socketId === socket.id)
       if (!player) return
-      
+
       console.log(`[REACTION] ${player.name} sent ${emoji} in room ${roomId}`)
-      
+
       // Broadcast reaction to all players in room
       io.to(roomId.toUpperCase()).emit('reaction-received', {
         emoji,
@@ -1072,6 +1074,71 @@ app.prepare().then(() => {
         playerSymbol: player.symbol,
         timestamp: Date.now(),
       })
+    })
+
+    // Start turn timer
+    socket.on('start-turn-timer', (roomId) => {
+      const game = games.get(roomId.toUpperCase())
+      if (!game) return
+
+      // Clear any existing timer
+      if (game.turnTimer) {
+        clearInterval(game.turnTimer)
+      }
+
+      game.turnTimeLeft = 15
+
+      // Send initial timer state
+      io.to(roomId.toUpperCase()).emit('turn-timer', {
+        timeLeft: game.turnTimeLeft,
+        currentPlayer: game.currentPlayer,
+      })
+
+      // Start countdown
+      game.turnTimer = setInterval(() => {
+        game.turnTimeLeft--
+
+        io.to(roomId.toUpperCase()).emit('turn-timer', {
+          timeLeft: game.turnTimeLeft,
+          currentPlayer: game.currentPlayer,
+        })
+
+        if (game.turnTimeLeft <= 0) {
+          // Time's up! Switch turn automatically
+          clearInterval(game.turnTimer)
+          game.turnTimer = null
+
+          console.log(`[TIMER] Time's up for ${game.currentPlayer}, switching turn`)
+
+          // Switch turn
+          game.currentPlayer = game.currentPlayer === 'X' ? 'O' : 'X'
+          game.allowedColumn = null
+
+          // Notify players
+          io.to(roomId.toUpperCase()).emit('turn-expired', {
+            previousPlayer: game.currentPlayer === 'X' ? 'O' : 'X',
+            newCurrentPlayer: game.currentPlayer,
+          })
+
+          // Start new timer for next player
+          if (game.players.size >= 2) {
+            setTimeout(() => {
+              socket.emit('start-turn-timer', roomId)
+            }, 1000)
+          }
+        }
+      }, 1000)
+    })
+
+    // Stop turn timer
+    socket.on('stop-turn-timer', (roomId) => {
+      const game = games.get(roomId.toUpperCase())
+      if (!game) return
+
+      if (game.turnTimer) {
+        clearInterval(game.turnTimer)
+        game.turnTimer = null
+      }
     })
   })
 
