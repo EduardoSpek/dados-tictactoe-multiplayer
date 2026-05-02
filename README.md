@@ -29,6 +29,8 @@ Um jogo da velha inovador com mecânicas de dados, dois tabuleiros simultâneos 
 - **🔄 Reconexão Automática**: Volte ao jogo mesmo se atualizar a página
 - **✨ Indicador de Vez**: Borda glow amarela pulsante quando é sua vez de jogar
 - **😀 Reações com Emoji**: Comunique-se com oponente usando emojis (feliz, triste, raiva, risada, descolado)
+- **⏱️ Timer de Turno**: 15 segundos para jogar, caso expire a vez passa automaticamente
+- **🔊 Som de Turno Perdido**: Alerta sonoro quando o timer expira e a vez passa
 
 ### 💰 Sistema de Moedas e Compras
 - **🪙 Ganhe Moedas**: Receba 1 moeda ao vencer uma rodada
