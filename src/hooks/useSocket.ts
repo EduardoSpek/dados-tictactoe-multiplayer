@@ -53,6 +53,7 @@ interface GameState {
   clearMode: boolean
   inversionMode: boolean
   restoreMode: boolean
+  timeAttackMode: boolean
   gameStarted: boolean
   score: { playerX: number; playerO: number }
   coins: { playerX: number; playerO: number }
@@ -206,6 +207,7 @@ export function useSocket() {
         clearMode: data.clearMode || false,
         inversionMode: data.inversionMode || false,
         restoreMode: data.restoreMode || false,
+        timeAttackMode: data.timeAttackMode || false,
         gameStarted: true,
       }))
     })
@@ -233,6 +235,7 @@ export function useSocket() {
         clearMode: data.clearMode || false,
         inversionMode: data.inversionMode || false,
         restoreMode: data.restoreMode || false,
+        timeAttackMode: data.timeAttackMode || false,
         isRolling: false,
         columnFull: data.columnFull || false,
       }))
@@ -403,12 +406,19 @@ export function useSocket() {
       }))
     })
 
-    socket.on('turn-expired', (data: { previousPlayer: 'X' | 'O'; newCurrentPlayer: 'X' | 'O' }) => {
+    socket.on('turn-expired', (data: { previousPlayer: 'X' | 'O'; newCurrentPlayer: 'X' | 'O'; coins: { playerX: number; playerO: number } }) => {
       console.log('Turn expired:', data)
       setGameState(prev => ({
         ...prev,
         currentPlayer: data.newCurrentPlayer,
-        turnTimeLeft: 10,
+        turnTimeLeft: 15,
+        allowedColumn: null,
+        diceValue: null,
+        stealMode: false,
+        clearMode: false,
+        inversionMode: false,
+        timeAttackMode: false,
+        coins: data.coins,
       }))
     })
 
@@ -421,6 +431,7 @@ export function useSocket() {
       clearMode: boolean
       inversionMode: boolean
       restoreMode: boolean
+      timeAttackMode: boolean
     }) => {
       console.log('Mode bought:', data)
       setGameState(prev => ({
@@ -431,6 +442,7 @@ export function useSocket() {
         clearMode: data.clearMode,
         inversionMode: data.inversionMode,
         restoreMode: data.restoreMode,
+        timeAttackMode: data.timeAttackMode,
       }))
     })
 

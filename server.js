@@ -66,6 +66,7 @@ app.prepare().then(() => {
         restoreMode: false,
         lastClearBy: null,
         boardBeforeClear: null,
+        timeAttackMode: false,
         gameStarted: false,
         score: { playerX: 0, playerO: 0 },
         coins: { playerX: 0, playerO: 0 },
@@ -649,6 +650,12 @@ app.prepare().then(() => {
         game.inversionModeBought = true
       } else if (mode === 'restore') {
         game.restoreMode = true
+      } else if (mode === 'time') {
+        game.timeAttackMode = true
+        // Time attack passes turn to opponent immediately
+        game.currentPlayer = game.currentPlayer === 'X' ? 'O' : 'X'
+        game.allowedColumn = null
+        console.log(`[BUY] Time attack activated - turn passed to ${game.currentPlayer}`)
       }
 
       console.log(`[BUY] Mode activated: ${mode}, remaining coins: X=${game.coins.playerX} O=${game.coins.playerO}`)
@@ -661,6 +668,7 @@ app.prepare().then(() => {
         clearMode: game.clearMode,
         inversionMode: game.inversionMode,
         restoreMode: game.restoreMode,
+        timeAttackMode: game.timeAttackMode,
       })
     })
 
@@ -753,21 +761,13 @@ app.prepare().then(() => {
             game.score.playerO++
           }
 
-          // Award coin every 3 wins
+          // Award coin on every win
           if (game.currentPlayer === 'X') {
-            game.winStreak.playerX++
-            if (game.winStreak.playerX >= 3) {
-              game.coins.playerX++
-              game.winStreak.playerX = 0
-              console.log(`[COIN] Player X earned a coin! Total: ${game.coins.playerX}`)
-            }
+            game.coins.playerX++
+            console.log(`[COIN] Player X earned a coin! Total: ${game.coins.playerX}`)
           } else {
-            game.winStreak.playerO++
-            if (game.winStreak.playerO >= 3) {
-              game.coins.playerO++
-              game.winStreak.playerO = 0
-              console.log(`[COIN] Player O earned a coin! Total: ${game.coins.playerO}`)
-            }
+            game.coins.playerO++
+            console.log(`[COIN] Player O earned a coin! Total: ${game.coins.playerO}`)
           }
 
           console.log(`[WIN] Player ${game.currentPlayer} won! Score: X=${game.score.playerX} O=${game.score.playerO}, Coins: X=${game.coins.playerX} O=${game.coins.playerO}`)
@@ -823,21 +823,13 @@ app.prepare().then(() => {
           game.score.playerO++
         }
 
-        // Award coin every 3 wins
+        // Award coin on every win
         if (game.currentPlayer === 'X') {
-          game.winStreak.playerX++
-          if (game.winStreak.playerX >= 3) {
-            game.coins.playerX++
-            game.winStreak.playerX = 0
-            console.log(`[COIN] Player X earned a coin! Total: ${game.coins.playerX}`)
-          }
+          game.coins.playerX++
+          console.log(`[COIN] Player X earned a coin! Total: ${game.coins.playerX}`)
         } else {
-          game.winStreak.playerO++
-          if (game.winStreak.playerO >= 3) {
-            game.coins.playerO++
-            game.winStreak.playerO = 0
-            console.log(`[COIN] Player O earned a coin! Total: ${game.coins.playerO}`)
-          }
+          game.coins.playerO++
+          console.log(`[COIN] Player O earned a coin! Total: ${game.coins.playerO}`)
         }
 
         console.log(`[WIN] Player ${game.currentPlayer} won! Score: X=${game.score.playerX} O=${game.score.playerO}, Coins: X=${game.coins.playerX} O=${game.coins.playerO}`)
@@ -1086,7 +1078,8 @@ app.prepare().then(() => {
         clearInterval(game.turnTimer)
       }
 
-      game.turnTimeLeft = 15
+      // Time attack mode reduces timer to 5 seconds
+      game.turnTimeLeft = game.timeAttackMode ? 5 : 15
 
       // Send initial timer state
       io.to(roomId.toUpperCase()).emit('turn-timer', {
@@ -1110,14 +1103,34 @@ app.prepare().then(() => {
 
           console.log(`[TIMER] Time's up for ${game.currentPlayer}, switching turn`)
 
+          // Identify the player who ran out of time (current player before switch)
+          const previousPlayer = game.currentPlayer
+          const newPlayer = previousPlayer === 'X' ? 'O' : 'X'
+
+          // Penalty: transfer 1 coin from player who ran out of time to opponent
+          if (previousPlayer === 'X' && game.coins.playerX > 0) {
+            game.coins.playerX--
+            game.coins.playerO++
+            console.log(`[PENALTY] Player X lost 1 coin to Player O (timeout)`)
+          } else if (previousPlayer === 'O' && game.coins.playerO > 0) {
+            game.coins.playerO--
+            game.coins.playerX++
+            console.log(`[PENALTY] Player O lost 1 coin to Player X (timeout)`)
+          }
+
           // Switch turn
-          game.currentPlayer = game.currentPlayer === 'X' ? 'O' : 'X'
+          game.currentPlayer = newPlayer
           game.allowedColumn = null
+          game.stealMode = false
+          game.clearMode = false
+          game.inversionMode = false
+          game.timeAttackMode = false // Reset time attack after turn switches
 
           // Notify players
           io.to(roomId.toUpperCase()).emit('turn-expired', {
-            previousPlayer: game.currentPlayer === 'X' ? 'O' : 'X',
-            newCurrentPlayer: game.currentPlayer,
+            previousPlayer: previousPlayer,
+            newCurrentPlayer: newPlayer,
+            coins: game.coins,
           })
 
           // Start new timer for next player
