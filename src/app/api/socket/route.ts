@@ -95,7 +95,18 @@ export async function GET(req: NextRequest) {
         symbol,
         name: data.playerName,
       }
-      
+
+      // Check if this socket was previously in the room (reconnection)
+      const existingPlayer = Array.from(game.players.values()).find(p => p.socketId === socket.id)
+      if (existingPlayer) {
+        // Reconnecting player - update socket ID but keep same player info
+        game.players.delete(existingPlayer.id)
+        player.id = existingPlayer.id
+        player.symbol = existingPlayer.symbol
+        player.name = existingPlayer.name
+        player.disconnectedAt = undefined
+      }
+
       game.players.set(socket.id, player)
       socket.join(data.roomId.toUpperCase())
       
@@ -108,8 +119,13 @@ export async function GET(req: NextRequest) {
         name: data.playerName,
         playerCount: game.players.size,
       })
-      
-      // Start game if 2 players
+
+      // If this was a reconnection, notify everyone
+      if (existingPlayer) {
+        io.to(data.roomId.toUpperCase()).emit('player-rejoined', { playerId: socket.id })
+      }
+
+      // Auto-start when 2 players are connected
       if (game.players.size === 2) {
         game.gameStarted = true
         io.to(data.roomId.toUpperCase()).emit('game-started', {
@@ -117,8 +133,21 @@ export async function GET(req: NextRequest) {
           players: Array.from(game.players.values()).map(p => ({ name: p.name, symbol: p.symbol })),
         })
       }
-      
+
       console.log(`Player ${data.playerName} joined room ${data.roomId}`)
+    })
+
+    // Handle start-game-now (manual start)
+    socket.on('start-game-now', (data: { roomId: string }) => {
+      const game = games.get(data.roomId.toUpperCase())
+      if (!game || game.gameStarted || game.players.size < 2) return
+
+      game.gameStarted = true
+      io.to(data.roomId.toUpperCase()).emit('game-started', {
+        currentPlayer: 'X',
+        players: Array.from(game.players.values()).map(p => ({ name: p.name, symbol: p.symbol })),
+      })
+      console.log(`Game started in room ${data.roomId}`)
     })
 
     // Handle dice roll
@@ -314,22 +343,45 @@ export async function GET(req: NextRequest) {
       })
     })
 
-    // Disconnect
+    // Disconnect - only emit player-left if player doesn't reconnect within 5 seconds
     socket.on('disconnect', () => {
       console.log('Player disconnected:', socket.id)
-      
-      // Find and clean up games
+
+      // Find the player's room first
+      let playerRoom = null
       games.forEach((game, roomId) => {
         if (game.players.has(socket.id)) {
-          game.players.delete(socket.id)
-          io.to(roomId).emit('player-left', { playerId: socket.id })
-          
-          if (game.players.size === 0) {
-            games.delete(roomId)
-            console.log(`Room ${roomId} deleted`)
-          }
+          playerRoom = { roomId, game }
         }
       })
+
+      if (!playerRoom) return
+
+      const { roomId, game } = playerRoom
+
+      // Mark player as disconnected but don't remove immediately
+      const player = game.players.get(socket.id)
+      if (player) {
+        player.disconnectedAt = Date.now()
+
+        // Notify others that player is disconnected (temporarily)
+        io.to(roomId).emit('player-temporarily-disconnected', { playerId: socket.id })
+
+        // After 5 seconds, if player hasn't reconnected, remove them
+        setTimeout(() => {
+          const currentPlayer = game.players.get(socket.id)
+          if (currentPlayer && currentPlayer.disconnectedAt) {
+            // Player didn't reconnect - actually remove them
+            game.players.delete(socket.id)
+            io.to(roomId).emit('player-left', { playerId: socket.id })
+
+            if (game.players.size === 0) {
+              games.delete(roomId)
+              console.log(`Room ${roomId} deleted`)
+            }
+          }
+        }, 5000)
+      }
     })
   })
 

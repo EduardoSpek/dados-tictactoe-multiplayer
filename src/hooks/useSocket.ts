@@ -71,8 +71,13 @@ export function useSocket() {
   const [isConnected, setIsConnected] = useState(false)
   const [roomId, setRoomId] = useState<string | null>(null)
   const [playerSymbol, setPlayerSymbol] = useState<'X' | 'O' | null>(() => {
-    // Try to recover from localStorage on init
+    // Try to get from URL first (for quick match), then localStorage
     if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const urlSymbol = urlParams.get('symbol')
+      if (urlSymbol === 'X' || urlSymbol === 'O') {
+        return urlSymbol
+      }
       const saved = localStorage.getItem('playerSymbol')
       return saved as 'X' | 'O' | null
     }
@@ -154,33 +159,45 @@ export function useSocket() {
       setPlayers(data)
     })
 
+    // Room ready event - for room code mode, when both players have joined
+    socket.on('room-ready', (data: { roomId: string; players: Player[] }) => {
+      console.log('[CLIENT] ★★★ room-ready received ★★★:', data)
+      console.log('[CLIENT] Players count:', data.players?.length)
+      console.log('[CLIENT] Players data:', JSON.stringify(data.players))
+      setPlayers(data.players)
+      // Also set gameStarted to true so players can roll the dice
+      setGameState(prev => ({ ...prev, gameStarted: true, isRolling: false }))
+      console.log('[CLIENT] gameStarted set to true!')
+    })
+
+    // Game started event (emitted by Next.js route.ts)
+    socket.on('game-started', (data: { currentPlayer: 'X' | 'O'; players: Player[] }) => {
+      console.log('[CLIENT] Game started (game-started):', data)
+      setGameState(prev => ({ ...prev, gameStarted: true, currentPlayer: data.currentPlayer }))
+      setPlayers(data.players)
+    })
+
     socket.on('start-game', (data: { roomId: string; players: Player[]; currentPlayer: 'X' | 'O' }) => {
-      console.log('Start game:', data)
+      console.log('[CLIENT] ★★★ Start game received ★★★:', data)
       // Update game state for ALL players (both creator and player 2)
       setPlayers(data.players)
-      setGameState(prev => ({ ...prev, gameStarted: true, currentPlayer: data.currentPlayer }))
-      
-      // Only set symbol and redirect if we don't have one yet (creator)
-      // Player 2 already has symbol from joinRoom callback
-      const existingSymbol = localStorage.getItem('playerSymbol')
-      if (!existingSymbol) {
-        // Find my symbol from players list and save to localStorage BEFORE redirect
-        const myName = localStorage.getItem('playerName')
+      setGameState(prev => ({ ...prev, gameStarted: true, currentPlayer: data.currentPlayer, isRolling: false }))
+
+      // Only set symbol and redirect if we don't have one yet AND not already on game page
+      const existingSymbol = sessionStorage.getItem('playerSymbol')
+      if (!existingSymbol && !window.location.pathname.includes('/game')) {
+        // Find my symbol from players list and save to sessionStorage BEFORE redirect
+        const myName = sessionStorage.getItem('playerName')
         const me = data.players.find((p: Player) => p.name === myName)
         if (me) {
           setPlayerSymbol(me.symbol)
-          localStorage.setItem('playerSymbol', me.symbol)
+          sessionStorage.setItem('playerSymbol', me.symbol)
         }
         // Redirect to game page (only for creator)
         window.location.href = `/game?room=${data.roomId}`
       }
     })
 
-    socket.on('game-started', (data: { currentPlayer: 'X' | 'O'; players: Player[] }) => {
-      console.log('Game started:', data)
-      setGameState(prev => ({ ...prev, gameStarted: true, currentPlayer: data.currentPlayer }))
-      setPlayers(data.players)
-    })
 
     socket.on('sync-game-state', (data: {
       boardLeft: (string | null)[][]
@@ -254,24 +271,28 @@ export function useSocket() {
       coins?: { playerX: number; playerO: number }
       playSound?: boolean
     }) => {
+      console.log('[cell-marked] Received:', data)
       // Play sound if server sent playSound flag
       if (data.playSound) {
         playPlaceMarkSound()
       }
-      setGameState(prev => ({
-        ...prev,
-        boardLeft: data.boardLeft,
-        boardRight: data.boardRight,
-        currentPlayer: data.currentPlayer,
-        winner: data.winner,
-        allowedColumn: null,
-        stealMode: false,
-        clearMode: false,
-        inversionMode: false,
-        restoreMode: false,
-        score: data.score || prev.score,
-        coins: data.coins || prev.coins,
-      }))
+      setGameState(prev => {
+        console.log('[cell-marked] Updating currentPlayer from', prev.currentPlayer, 'to', data.currentPlayer)
+        return {
+          ...prev,
+          boardLeft: data.boardLeft,
+          boardRight: data.boardRight,
+          currentPlayer: data.currentPlayer,
+          winner: data.winner,
+          allowedColumn: null,
+          stealMode: false,
+          clearMode: false,
+          inversionMode: false,
+          restoreMode: false,
+          score: data.score || prev.score,
+          coins: data.coins || prev.coins,
+        }
+      })
     })
 
     socket.on('cell-stolen', (data: {
@@ -500,19 +521,22 @@ export function useSocket() {
     socketRef.current.emit('create-room', playerName, (newRoomId: string) => {
       setRoomId(newRoomId)
       setPlayerSymbol('X')
-      localStorage.setItem('playerSymbol', 'X')
-      localStorage.setItem('inRoom', newRoomId)
+      sessionStorage.setItem('playerSymbol', 'X')
+      sessionStorage.setItem('inRoom', newRoomId)
       callback(newRoomId)
     })
   }, [])
 
   const joinRoom = useCallback((roomId: string, playerName: string, callback: (success: boolean, message?: string, symbol?: 'X' | 'O') => void) => {
     if (!socketRef.current) return
+    console.log('[joinRoom] Joining room:', roomId, 'as', playerName)
     socketRef.current.emit('join-room', { roomId, playerName }, (success: boolean, message?: string) => {
+      console.log('[joinRoom] Result:', success, 'message:', message)
       if (success) {
         setRoomId(roomId.toUpperCase())
         // Determine symbol from message - check for "Jogador X" or "Jogador O"
         const symbol = message?.includes('Jogador X') ? 'X' : 'O'
+        console.log('[joinRoom] Setting playerSymbol to:', symbol)
         setPlayerSymbol(symbol)
         localStorage.setItem('playerSymbol', symbol)
         localStorage.setItem('inRoom', roomId.toUpperCase())
@@ -522,7 +546,12 @@ export function useSocket() {
   }, [])
 
   const rollDice = useCallback(() => {
-    if (!socketRef.current || !roomId) return
+    console.log('[rollDice] Called - socket:', !!socketRef.current, 'roomId:', roomId)
+    if (!socketRef.current || !roomId) {
+      console.log('[rollDice] Early return - no socket or roomId')
+      return
+    }
+    console.log('[rollDice] Emitting roll-dice event for room:', roomId)
     socketRef.current.emit('roll-dice', roomId)
   }, [roomId])
 
@@ -598,6 +627,43 @@ export function useSocket() {
     socketRef.current.emit('stop-turn-timer', roomId)
   }, [roomId])
 
+  const findMatch = useCallback((playerName: string, callback: (result: { status: string; roomId?: string }) => void) => {
+    if (!socketRef.current) return
+    socketRef.current.emit('find-match', playerName, (result: { status: string; roomId?: string }) => {
+      if (result.status === 'waiting') {
+        // Waiting for opponent - listen for match-found event
+      } else if (result.status === 'already-in-game' && result.roomId) {
+        setRoomId(result.roomId.toUpperCase())
+      }
+      callback(result)
+    })
+  }, [])
+
+  const cancelMatch = useCallback(() => {
+    if (!socketRef.current) return
+    socketRef.current.emit('cancel-match')
+  }, [])
+
+  // Listen for match-found events
+  useEffect(() => {
+    if (!socketRef.current) return
+
+    const handleMatchFound = (data: { roomId: string; symbol: 'X' | 'O'; opponent: string; players: { name: string; symbol: string }[] }) => {
+      console.log('[useSocket] Match found - received symbol:', data.symbol, 'room:', data.roomId)
+      setRoomId(data.roomId.toUpperCase())
+      // Symbol is now read from URL in useState init, just store in localStorage for reconnection
+      console.log('[useSocket] Symbol will be read from URL')
+      localStorage.setItem('playerSymbol', data.symbol)
+      localStorage.setItem('inRoom', data.roomId.toUpperCase())
+    }
+
+    socketRef.current.on('match-found', handleMatchFound)
+
+    return () => {
+      socketRef.current?.off('match-found', handleMatchFound)
+    }
+  }, [])
+
   return {
     isConnected,
     roomId,
@@ -618,7 +684,10 @@ export function useSocket() {
     resetGame,
     sendReaction,
     startTurnTimer,
+    setPlayerSymbol,
     stopTurnTimer,
+    findMatch,
+    cancelMatch,
     socketRef,
   }
 }

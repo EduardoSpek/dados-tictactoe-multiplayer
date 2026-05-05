@@ -45,6 +45,7 @@ Um jogo da velha inovador com mecânicas de dados, dois tabuleiros simultâneos 
 - **Código na Área de Transferência**: Ao criar sala, o código é copiado automaticamente
 - **Conexão Automática**: Dois jogadores no mesmo link se conectam automaticamente
 - **Entre por Código**: Conecte-se a salas existentes facilmente
+- **🎯 Matchmaking Automático**: Encontre oponentes instantaneamente! Entre na fila e seja conectado a outro jogador automaticamente
 - **Tempo Real**: Comunicação instantânea via WebSocket
 - **Suporte a Rede Local**: Jogue na mesma rede WiFi
 
@@ -102,6 +103,13 @@ Para jogar com amigos na mesma rede:
 ---
 
 ## 🎮 Como Jogar
+
+### Modo Rápido (Matchmaking)
+1. Acesse a página inicial
+2. Digite seu nome
+3. Clique em "🎯 Encontrar Oponente"
+4. Aguarde até encontrar um oponente
+5. Jogue automaticamente!
 
 ### Criar uma Sala
 1. Acesse a página inicial

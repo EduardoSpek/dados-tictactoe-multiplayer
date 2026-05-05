@@ -31,6 +31,7 @@ export default function GamePage() {
     rejoinRoom,
     startTurnTimer,
     socketRef,
+    setPlayerSymbol,
   } = useSocket()
 
   const { playDiceRoll, playWin, playSteal, playClear, playColumnFull, playTurnExpired } = useSound()
@@ -87,34 +88,87 @@ export default function GamePage() {
 
   useEffect(() => {
     setMounted(true)
-    // Get player name from localStorage
-    const storedName = localStorage.getItem('playerName')
-    if (storedName) {
-      setPlayerName(storedName)
+    // Get player name from URL first (for quick match to avoid localStorage conflicts)
+    const params = new URLSearchParams(window.location.search)
+    const urlName = params.get('name')
+    if (urlName) {
+      setPlayerName(decodeURIComponent(urlName))
+      // Don't save URL name to storage - it's just for this session
+    } else {
+      // Fallback to sessionStorage (each tab has its own name)
+      const storedName = sessionStorage.getItem('playerName')
+      if (storedName) {
+        setPlayerName(storedName)
+      }
     }
     // Clear inRoom flag when entering game page (for fresh start next time)
     localStorage.removeItem('inRoom')
   }, [])
 
+  // Listen for start-game event (for quick match)
+  useEffect(() => {
+    if (!socketRef.current) return
+
+    // Get name from URL directly to avoid stale state
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlName = urlParams.get('name')
+    const myName = urlName ? decodeURIComponent(urlName) : playerName
+
+    const handleStartGame = (data: { roomId: string; players: { name: string; symbol: string }[]; currentPlayer: string }) => {
+      console.log('[Game] Start game event received:', data)
+      console.log('[Game] My playerName (from URL):', myName)
+      // Find my symbol from the players list (with trim to handle extra spaces)
+      const myPlayer = data.players.find(p => p.name.trim() === myName.trim())
+      if (myPlayer) {
+        console.log('[Game] My symbol from start-game:', myPlayer.symbol)
+        sessionStorage.setItem('playerSymbol', myPlayer.symbol)
+        setPlayerSymbol(myPlayer.symbol as 'X' | 'O')
+      } else {
+        console.log('[Game] Could not find my player in list!')
+      }
+      setJoined(true)
+      // currentPlayer is already set in useSocket via setGameState
+    }
+
+    socketRef.current.on('start-game', handleStartGame)
+
+    return () => {
+      socketRef.current?.off('start-game', handleStartGame)
+    }
+  }, [socketRef, playerName, setPlayerSymbol])
+
+  // Also sync playerSymbol from useSocket when it changes
+  useEffect(() => {
+    if (playerSymbol) {
+      console.log('[Game] playerSymbol changed to:', playerSymbol)
+      localStorage.setItem('playerSymbol', playerSymbol)
+    }
+  }, [playerSymbol])
+
   // Join room when entering game page
   useEffect(() => {
+    // Get symbol from URL first (from matchmaking)
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlSymbol = urlParams.get('symbol')
+
+    // If no symbol in URL, clear localStorage to avoid stale data
+    // This handles the case where a new player joins without URL symbol
+    if (!urlSymbol) {
+      localStorage.removeItem('playerSymbol')
+    }
+
     const savedSymbol = localStorage.getItem('playerSymbol')
+    const finalSymbol = urlSymbol || savedSymbol
 
-    // If we have a saved symbol for this room, try to rejoin
-    if (savedSymbol && roomId) {
-      // Creator (X) needs to rejoin via socket
-      if (savedSymbol === 'X' && isConnected && !joined) {
-        joinAsCreator(roomId, (success) => {
-          if (success) {
-            setJoined(true)
-          }
-        })
-        return
-      }
+    console.log('[Game] Symbol from URL:', urlSymbol, 'from localStorage:', savedSymbol, 'final:', finalSymbol)
 
-      // Player 2 (O) needs to rejoin via socket too
-      if (savedSymbol === 'O' && isConnected && !joined) {
-        rejoinRoom(roomId, (success) => {
+    // If we have a symbol, try to join
+    if (finalSymbol && roomId) {
+      // Both X and O join normally - the server will assign the correct symbol
+      // based on existing players in the room
+      if (isConnected && !joined) {
+        console.log('[Game] Joining room as', finalSymbol, '...')
+        joinRoom(roomId, playerName, (success) => {
           if (success) {
             setJoined(true)
           }
@@ -263,7 +317,16 @@ export default function GamePage() {
   }
 
   const isMyTurn = playerSymbol === gameState.currentPlayer
-  const canRoll = isMyTurn && !gameState.isRolling && !gameState.winner && !gameState.allowedColumn && !gameState.stealMode && !gameState.clearMode && !gameState.restoreMode
+  const canRoll = gameState.gameStarted && isMyTurn && !gameState.isRolling && !gameState.winner && !gameState.stealMode && !gameState.clearMode && !gameState.restoreMode
+  console.log('[Game] ★ canRoll:', canRoll, 'gameStarted:', gameState.gameStarted, 'isMyTurn:', isMyTurn, 'isRolling:', gameState.isRolling, 'winner:', gameState.winner, 'playerSymbol:', playerSymbol, 'currentPlayer:', gameState.currentPlayer, 'stealMode:', gameState.stealMode, 'clearMode:', gameState.clearMode)
+
+  // Debug: Log when dice is clicked
+  const handleDiceClickDebug = () => {
+    console.log('[Dice] Clicked! canRoll:', canRoll, 'playerSymbol:', playerSymbol, 'currentPlayer:', gameState.currentPlayer)
+    if (canRoll) {
+      rollDice()
+    }
+  }
   const leftBoardActive = gameState.allowedColumn !== null && gameState.allowedColumn <= 2
   const rightBoardActive = gameState.allowedColumn !== null && gameState.allowedColumn >= 3
 
@@ -364,6 +427,48 @@ export default function GamePage() {
             <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
               Compartilhe o código <strong>{roomId}</strong> com seu amigo!
             </p>
+          </div>
+        )}
+
+        {/* Room ready - waiting for start (room code mode) */}
+        {!gameState.gameStarted && players.length === 2 && (
+          <div className="mb-4 p-4 bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-600 rounded-lg text-center">
+            <p className="text-green-700 dark:text-green-300 font-semibold">
+              Ambos jogadores conectados! Preparados?
+            </p>
+            <button
+              onClick={() => {
+                console.log('[Game] ★★★ Clicked Iniciar Partida ★★★')
+                console.log('[Game] socketRef:', socketRef?.current ? 'exists' : 'null')
+                console.log('[Game] roomId from URL:', roomId)
+                console.log('[Game] isConnected:', isConnected)
+
+                if (!socketRef.current) {
+                  console.error('[Game] Socket not available!')
+                  alert('Socket não conectado')
+                  return
+                }
+                if (!roomId) {
+                  console.error('[Game] Room ID missing!')
+                  alert('Sala não encontrada')
+                  return
+                }
+
+                console.log('[Game] Emitting start-game-now with roomId:', roomId)
+                console.log('[Game] Socket ID:', socketRef.current.id)
+                console.log('[Game] Socket connected:', socketRef.current.connected)
+
+                socketRef.current.emit('start-game-now', { roomId }, (response: any) => {
+                  console.log('[Game] start-game-now response:', response)
+                  if (!response) {
+                    alert('Erro ao iniciar partida')
+                  }
+                })
+              }}
+              className="mt-3 px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors"
+            >
+              Iniciar Partida
+            </button>
           </div>
         )}
 

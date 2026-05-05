@@ -14,6 +14,9 @@ const handle = app.getRequestHandler()
 // Store for active games
 const games = new Map()
 
+// Queue for quick match (players waiting for an opponent)
+const matchmakingQueue = []
+
 app.prepare().then(() => {
   const httpServer = createServer(async (req, res) => {
     try {
@@ -68,6 +71,7 @@ app.prepare().then(() => {
         boardBeforeClear: null,
         timeAttackMode: false,
         gameStarted: false,
+        isQuickMatch: false,  // true = auto-start when 2 players, false = wait for 2nd player
         score: { playerX: 0, playerO: 0 },
         coins: { playerX: 0, playerO: 0 },
         winStreak: { playerX: 0, playerO: 0 },
@@ -90,6 +94,154 @@ app.prepare().then(() => {
       callback(roomId)
       console.log(`[CREATE] Room ${roomId} created by ${playerName} (Player X, socket: ${socket.id}, playerId: ${player.id})`)
       console.log(`[CREATE] Total players in room: ${game.players.size}`)
+    })
+
+    // Find match - quick match with random opponent
+    socket.on('find-match', (playerName, callback) => {
+      console.log(`[MATCH] Player ${playerName} (${socket.id}) looking for match`)
+
+      // Check if this socket is already in queue
+      const existingInQueue = matchmakingQueue.find(p => p.socketId === socket.id)
+      if (existingInQueue) {
+        console.log(`[MATCH] Player ${playerName} already in queue`)
+        callback({ status: 'waiting' })
+        return
+      }
+
+      // Check if this socket is already in a game
+      for (const [roomId, game] of games) {
+        const playerInGame = Array.from(game.players.values()).find(p => p.socketId === socket.id)
+        if (playerInGame) {
+          console.log(`[MATCH] Player ${playerName} already in game ${roomId}`)
+          callback({ status: 'already-in-game', roomId })
+          return
+        }
+      }
+
+      // Add player to queue
+      matchmakingQueue.push({
+        socketId: socket.id,
+        name: playerName,
+        joinedAt: Date.now(),
+      })
+
+      console.log(`[MATCH] Added to queue. Queue size: ${matchmakingQueue.length}`)
+
+      // Notify player they're waiting
+      callback({ status: 'waiting' })
+
+      // Try to match with another player
+      if (matchmakingQueue.length >= 2) {
+        // Get the first two players from queue
+        const player1 = matchmakingQueue.shift()
+        const player2 = matchmakingQueue.shift()
+
+        // Make sure we have two different sockets
+        if (player1.socketId === player2.socketId) {
+          // Put player2 back in queue if same socket
+          matchmakingQueue.unshift(player2)
+          return
+        }
+
+        // Create a new game room for them
+        const roomId = Math.random().toString(36).substring(2, 6).toUpperCase()
+
+        const game = {
+          id: roomId,
+          players: new Map(),
+          boardLeft: Array(3).fill(null).map(() => Array(3).fill(null)),
+          boardRight: Array(3).fill(null).map(() => Array(3).fill(null)),
+          currentPlayer: 'X',
+          diceValue: 1,
+          isRolling: false,
+          allowedColumn: null,
+          winner: null,
+          stealMode: false,
+          clearMode: false,
+          inversionMode: false,
+          inversionModeBought: false,
+          restoreMode: false,
+          lastClearBy: null,
+          boardBeforeClear: null,
+          timeAttackMode: false,
+          gameStarted: false,
+          isQuickMatch: true,  // Quick match auto-starts when 2 players
+          score: { playerX: 0, playerO: 0 },
+          coins: { playerX: 0, playerO: 0 },
+          winStreak: { playerX: 0, playerO: 0 },
+          turnTimeLeft: 15,
+          turnTimer: null,
+        }
+
+        // Add player 1 as X
+        const p1 = {
+          id: uuidv4(),
+          socketId: player1.socketId,
+          symbol: 'X',
+          name: player1.name,
+        }
+        game.players.set(p1.id, p1)
+
+        // Add player 2 as O
+        const p2 = {
+          id: uuidv4(),
+          socketId: player2.socketId,
+          symbol: 'O',
+          name: player2.name,
+        }
+        game.players.set(p2.id, p2)
+
+        games.set(roomId, game)
+
+        // Get socket instances
+        const socket1 = io.sockets.sockets.get(player1.socketId)
+        const socket2 = io.sockets.sockets.get(player2.socketId)
+
+        if (socket1) socket1.join(roomId)
+        if (socket2) socket2.join(roomId)
+
+        console.log(`[MATCH] Match found! Room ${roomId}: ${player1.name}(X) vs ${player2.name}(O)`)
+
+        // Notify both players
+        if (socket1) {
+          socket1.emit('match-found', {
+            roomId,
+            symbol: 'X',
+            opponent: player2.name,
+            players: [{ name: player1.name, symbol: 'X' }, { name: player2.name, symbol: 'O' }],
+          })
+        }
+        if (socket2) {
+          socket2.emit('match-found', {
+            roomId,
+            symbol: 'O',
+            opponent: player1.name,
+            players: [{ name: player1.name, symbol: 'X' }, { name: player2.name, symbol: 'O' }],
+          })
+        }
+
+        // Start the game
+        game.gameStarted = true
+        const roomKey = roomId.toUpperCase()
+        console.log(`[START-GAME] Emitting start-game to room ${roomKey}, gameStarted=${game.gameStarted}`)
+        io.to(roomKey).emit('start-game', {
+          roomId: roomKey,
+          players: [{ name: player1.name, symbol: 'X' }, { name: player2.name, symbol: 'O' }],
+          currentPlayer: 'X',
+        })
+
+        console.log(`[MATCH] Game started in room ${roomId}`)
+      }
+    })
+
+    // Cancel matchmaking
+    socket.on('cancel-match', () => {
+      console.log(`[MATCH] Player ${socket.id} canceling matchmaking`)
+      const index = matchmakingQueue.findIndex(p => p.socketId === socket.id)
+      if (index !== -1) {
+        matchmakingQueue.splice(index, 1)
+        console.log(`[MATCH] Removed from queue. Queue size: ${matchmakingQueue.length}`)
+      }
     })
 
     // Join existing room
@@ -120,7 +272,16 @@ app.prepare().then(() => {
       const disconnectedPlayer = Array.from(game.players.values()).find(p => p.disconnectedAt)
 
       // Count only connected players
-      const connectedPlayers = Array.from(game.players.values()).filter(p => !p.disconnectedAt)
+      let connectedPlayers = Array.from(game.players.values()).filter(p => !p.disconnectedAt)
+
+      // If no connected players, clean up disconnected ones and start fresh
+      // BUT only if the game hasn't started yet (created via quick match)
+      // For rooms created via create-room, we want to preserve the creator
+      if (connectedPlayers.length === 0 && !game.gameStarted) {
+        console.log(`[JOIN] No connected players, cleaning up room ${data.roomId}`)
+        game.players.clear()
+        connectedPlayers = []
+      }
 
       if (connectedPlayers.length >= 2) {
         console.log(`[JOIN] Room ${data.roomId} is FULL (2 connected players)`)
@@ -128,16 +289,32 @@ app.prepare().then(() => {
         return
       }
 
-      // If there's a disconnected player, allow new player to join
-      // The disconnected player will need to rejoin when they come back
-      const symbol = connectedPlayers.length === 0 ? 'X' : 'O'
+      // Determine symbol based on connected players only
+      // If there's already a connected X, new player gets O
+      // If there's already a connected O, new player gets X
+      // If no connected players, new player gets X
+      let symbol
+      const hasX = connectedPlayers.some(p => p.symbol === 'X')
+      const hasO = connectedPlayers.some(p => p.symbol === 'O')
+
+      if (!hasX) {
+        symbol = 'X'
+      } else if (!hasO) {
+        symbol = 'O'
+      } else {
+        // Both symbols exist - room is full
+        console.log(`[JOIN] Room ${data.roomId} is FULL (both symbols taken)`)
+        callback(false, 'Sala cheia')
+        return
+      }
+      console.log(`[JOIN] Assigning symbol ${symbol} to ${data.playerName} (connectedPlayers: ${connectedPlayers.length})`)
       const player = {
         id: uuidv4(),
         socketId: socket.id,
         symbol,
         name: data.playerName,
       }
-      
+
       game.players.set(player.id, player)
       socket.join(data.roomId.toUpperCase())
       
@@ -162,33 +339,81 @@ app.prepare().then(() => {
         clearMode: game.clearMode || false,
       })
       console.log(`[JOIN] Sent sync-game-state to ${data.playerName}`)
-      
+
+      // Get connected players after new player joined
+      const connectedNow = Array.from(game.players.values()).filter(p => !p.disconnectedAt)
+
       // Notify room about new player
       io.to(data.roomId.toUpperCase()).emit('player-joined', {
         playerId: socket.id,
         symbol,
         name: data.playerName,
-        playerCount: game.players.size,
+        playerCount: connectedNow.length,
       })
       console.log(`[JOIN] Broadcast player-joined to room ${data.roomId}`)
-      
+
       // Start game if 2 players (and both are connected)
-      const connectedNow = Array.from(game.players.values()).filter(p => !p.disconnectedAt)
       if (connectedNow.length === 2 && !game.gameStarted) {
+        // Auto-start for both quick match AND room code mode
         game.gameStarted = true
         const playersList = connectedNow.map(p => ({ name: p.name, symbol: p.symbol }))
-        
-        // Notify both players to start game
-        io.to(data.roomId.toUpperCase()).emit('start-game', {
+        const roomKey = data.roomId.toUpperCase()
+        console.log(`[START-GAME] Emitting start-game to room ${roomKey}, gameStarted=${game.gameStarted}`)
+
+        io.to(roomKey).emit('start-game', {
           roomId: data.roomId.toUpperCase(),
           players: playersList,
           currentPlayer: game.currentPlayer,
         })
-        
-        console.log(`[JOIN] Game STARTED in room ${data.roomId}! Players:`, playersList)
+
+        console.log(`[JOIN] Game AUTO-STARTED in room ${data.roomId}! Players:`, playersList)
       }
       
       console.log(`[JOIN] Player ${data.playerName} joined room ${data.roomId} as ${symbol}`)
+    })
+
+    // Start game manually (for room code mode)
+    socket.on('start-game-now', (data, callback) => {
+      console.log(`[START-GAME-NOW] ★★★ Received from: ${socket.id}, room=${data.roomId} ★★★`)
+      console.log(`[START-GAME-NOW] Socket rooms:`, [...socket.rooms])
+      console.log(`[START-GAME-NOW] All games:`, Array.from(games.keys()))
+
+      const game = games.get(data.roomId.toUpperCase())
+
+      if (!game) {
+        console.log(`[START-GAME-NOW] Room ${data.roomId} NOT FOUND`)
+        if (callback) callback(false, 'Sala não encontrada')
+        return
+      }
+
+      // Only start if 2 players and game hasn't started yet
+      const connectedPlayers = Array.from(game.players.values()).filter(p => !p.disconnectedAt)
+      if (connectedPlayers.length !== 2) {
+        console.log(`[START-GAME-NOW] Not enough players: ${connectedPlayers.length}`)
+        if (callback) callback(false, 'Aguardando jogador 2')
+        return
+      }
+
+      if (game.gameStarted) {
+        console.log(`[START-GAME-NOW] Game already started`)
+        if (callback) callback(false, 'Jogo já iniciou')
+        return
+      }
+
+      // Start the game
+      game.gameStarted = true
+      const playersList = connectedPlayers.map(p => ({ name: p.name, symbol: p.symbol }))
+
+      io.to(data.roomId.toUpperCase()).emit('start-game', {
+        roomId: data.roomId.toUpperCase(),
+        players: playersList,
+        currentPlayer: game.currentPlayer,
+      })
+      console.log(`[START-GAME-NOW] Emitted 'start-game' to room ${data.roomId.toUpperCase()}`)
+
+      console.log(`[START-GAME-NOW] Game STARTED in room ${data.roomId}! Players:`, playersList)
+
+      if (callback) callback(true)
     })
 
     // Creator rejoins room when entering game page
@@ -286,8 +511,8 @@ app.prepare().then(() => {
         return
       }
       
-      // Find disconnected player (not X, so must be O)
-      const disconnectedPlayer = Array.from(game.players.values()).find(p => p.disconnectedAt && p.symbol === 'O')
+      // Find any disconnected player (X or O)
+      const disconnectedPlayer = Array.from(game.players.values()).find(p => p.disconnectedAt)
       
       if (!disconnectedPlayer) {
         console.log(`[REJOIN] No disconnected player O found`)
@@ -1004,7 +1229,14 @@ app.prepare().then(() => {
     // Disconnect
     socket.on('disconnect', () => {
       console.log(`[DISCONNECT] Socket ${socket.id} disconnected`)
-      
+
+      // Remove from matchmaking queue if present
+      const queueIndex = matchmakingQueue.findIndex(p => p.socketId === socket.id)
+      if (queueIndex !== -1) {
+        matchmakingQueue.splice(queueIndex, 1)
+        console.log(`[DISCONNECT] Removed from matchmaking queue. Queue size: ${matchmakingQueue.length}`)
+      }
+
       // Find and clean up games
       games.forEach((game, roomId) => {
         const player = Array.from(game.players.values()).find(p => p.socketId === socket.id)
@@ -1015,19 +1247,23 @@ app.prepare().then(() => {
           player.disconnectedAt = Date.now()
           player.oldSocketId = socket.id
           
-          // Notify others that player disconnected
-          io.to(roomId).emit('player-left', { playerId: player.id })
-          
+          // Don't emit player-left immediately - give player time to reconnect
+          // Instead, emit a temporary disconnection event
+          io.to(roomId).emit('player-temporarily-disconnected', { playerId: player.id })
+
           // Set timeout to actually remove player if they don't reconnect
           setTimeout(() => {
             const currentGame = games.get(roomId)
             if (!currentGame) return
-            
+
             const stillDisconnected = Array.from(currentGame.players.values()).find(p => p.id === player.id && p.disconnectedAt)
             if (stillDisconnected) {
               console.log(`[DISCONNECT] Removing ${player.name} after grace period`)
               currentGame.players.delete(player.id)
-              
+
+              // NOW emit player-left since player didn't reconnect
+              io.to(roomId).emit('player-left', { playerId: player.id })
+
               // Only delete room if no players left
               if (currentGame.players.size === 0) {
                 if (!currentGame.gameStarted) {
@@ -1042,7 +1278,7 @@ app.prepare().then(() => {
               }
             }
           }, 30000) // 30 second grace period for reconnection
-          
+
           console.log(`[DISCONNECT] ${player.name} has 30s to reconnect`)
         }
       })
@@ -1136,7 +1372,7 @@ app.prepare().then(() => {
           // Start new timer for next player
           if (game.players.size >= 2) {
             setTimeout(() => {
-              socket.emit('start-turn-timer', roomId)
+              io.to(roomId.toUpperCase()).emit('start-turn-timer', roomId)
             }, 1000)
           }
         }

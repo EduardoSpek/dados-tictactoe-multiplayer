@@ -97,7 +97,10 @@ export default function Dice({ value, size = 'md', isRolling = false, onClick, d
     <div className="flex items-center gap-3">
       {/* Dice Container */}
       <div
-        onClick={() => !disabled && onClick?.()}
+        onClick={() => {
+          console.log('[Dice] Clicked! disabled:', disabled, 'onClick exists:', !!onClick)
+          if (!disabled && onClick) onClick()
+        }}
         className={`
           ${sizeClasses[size]}
           ${diceBg}
