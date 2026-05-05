@@ -24,6 +24,8 @@ export default function OfflineGame() {
   const [mounted, setMounted] = useState(false)
   const [stealMode, setStealMode] = useState(false)
   const [clearMode, setClearMode] = useState(false)
+  const [inversionMode, setInversionMode] = useState(false)
+  const [restoreMode, setRestoreMode] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -42,8 +44,15 @@ export default function OfflineGame() {
   }, [])
 
   const rollDice = useCallback(() => {
-    if (isRolling || winner || allowedColumn !== null || stealMode) return
-    
+    if (isRolling || winner || allowedColumn !== null) return
+
+    // If in any mode (steal, clear), allow re-rolling to cancel
+    if (stealMode) {
+      setStealMode(false)
+      setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
+      return
+    }
+
     // If in clear mode, allow re-rolling to skip
     if (clearMode) {
       setClearMode(false)
@@ -51,10 +60,26 @@ export default function OfflineGame() {
       return
     }
 
+    // If in inversion mode, allow re-rolling to cancel
+    if (inversionMode) {
+      setInversionMode(false)
+      setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
+      return
+    }
+
+    // If in restore mode, allow re-rolling to cancel
+    if (restoreMode) {
+      setRestoreMode(false)
+      setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
+      return
+    }
+
     setIsRolling(true)
-         setStealMode(false)
-         setClearMode(false)
-         playDiceRoll()
+          setStealMode(false)
+          setClearMode(false)
+          setInversionMode(false)
+          setRestoreMode(false)
+          playDiceRoll()
 
          let rolls = 0
     const maxRolls = 15
@@ -83,15 +108,15 @@ export default function OfflineGame() {
           // Only allow 0 if there are opponent cells to steal
          // Allow 7 if there are any cells to clear (regardless of opponent cells)
         let finalValue: number
-        if (hasOpponentCells && Math.random() < 0.7) { // 70% chance of 0-6 when opponent cells exist
+        const roll = Math.random()
+        if (hasOpponentCells && roll < 0.6) { // 60% chance of 0-6 when opponent cells exist
           finalValue = Math.floor(Math.random() * 7) // 0-6
+        } else if (roll < 0.75) { // 15% chance of 7 (clear)
+          finalValue = 7
+        } else if (roll < 0.9) { // 15% chance of 8 (invert)
+          finalValue = 8
         } else {
-          // Increase probability of 7 when there are cells to clear
-          if (hasAnyCells && Math.random() < 0.3) { // 30% chance of 7
-            finalValue = 7
-          } else {
-            finalValue = Math.floor(Math.random() * 6) + 1 // 1-6
-          }
+          finalValue = Math.floor(Math.random() * 6) + 1 // 1-6
         }
 
         setDiceValue(finalValue)
@@ -101,16 +126,21 @@ export default function OfflineGame() {
            setStealMode(true)
            setAllowedColumn(null)
            playSteal()
-         } else if (finalValue === 7) {
-           if (hasAnyCells) {
-             setClearMode(true)
-             setAllowedColumn(null)
-             playSteal()
-           } else {
-             // No cells to clear, just pass turn
-             setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
-           }
-         } else {
+          } else if (finalValue === 7) {
+            if (hasAnyCells) {
+              setClearMode(true)
+              setAllowedColumn(null)
+              playSteal()
+            } else {
+              // No cells to clear, just pass turn
+              setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
+            }
+          } else if (finalValue === 8) {
+            // Inversion mode - invert all marks
+            setInversionMode(true)
+            setAllowedColumn(null)
+            playSteal()
+          } else {
           const column = finalValue - 1
           const boardSide = column <= 2 ? 'left' : 'right'
           const colIndex = column <= 2 ? column : column - 3
@@ -157,29 +187,51 @@ export default function OfflineGame() {
        return
      }
      
-     // Steal mode
-     if (stealMode) {
-      const opponent = currentPlayer === 'X' ? 'O' : 'X'
-      if (cellValue !== opponent) return
+      // Steal mode
+      if (stealMode) {
+       const opponent = currentPlayer === 'X' ? 'O' : 'X'
+       if (cellValue !== opponent) return
 
-      playSteal()
-      const newBoard = board.map(r => [...r])
-      newBoard[row][col] = currentPlayer
-      setBoard(newBoard)
+       playSteal()
+       const newBoard = board.map(r => [...r])
+       newBoard[row][col] = currentPlayer
+       setBoard(newBoard)
 
-      if (checkWinner(newBoard, currentPlayer)) {
-        setWinner(currentPlayer)
-        playWin()
-        setScore(prev => ({
-          ...prev,
-          [currentPlayer === 'X' ? 'playerX' : 'playerO']: prev[currentPlayer === 'X' ? 'playerX' : 'playerO'] + 1
-        }))
-      } else {
+       if (checkWinner(newBoard, currentPlayer)) {
+         setWinner(currentPlayer)
+         playWin()
+         setScore(prev => ({
+           ...prev,
+           [currentPlayer === 'X' ? 'playerX' : 'playerO']: prev[currentPlayer === 'X' ? 'playerX' : 'playerO'] + 1
+         }))
+       } else {
+         setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
+         setStealMode(false)
+       }
+       return
+     }
+
+      // Inversion mode - invert all marks on the clicked board
+      if (inversionMode) {
+        const newBoardLeft = boardLeft.map(row => row.map(cell => cell === 'X' ? 'O' : cell === 'O' ? 'X' : null))
+        const newBoardRight = boardRight.map(row => row.map(cell => cell === 'X' ? 'O' : cell === 'O' ? 'X' : null))
+        setBoardLeft(newBoardLeft)
+        setBoardRight(newBoardRight)
+
+        playSteal()
+        setInversionMode(false)
         setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
-        setStealMode(false)
+        return
       }
-      return
-    }
+
+      // Restore mode - restore cleared board (not implemented in offline yet)
+      if (restoreMode) {
+        // For offline, we don't have boardBeforeClear, so just cancel
+        playSteal()
+        setRestoreMode(false)
+        setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
+        return
+      }
 
     // Normal mode
     if (allowedColumn === null) return
@@ -298,12 +350,14 @@ export default function OfflineGame() {
                  currentPlayer={currentPlayer}
                  allowedColumn={allowedColumn}
                  onCellClick={(row, col) => handleCellClick('left', row, col)}
-                 playerName="1-3"
-                 isActive={leftBoardActive || stealMode || clearMode}
-                 diceStart={1}
-                 stealMode={stealMode}
-                 clearMode={clearMode}
-               />
+                  playerName="1-3"
+                  isActive={leftBoardActive || stealMode || clearMode || inversionMode || restoreMode}
+                  diceStart={1}
+                  stealMode={stealMode}
+                  clearMode={clearMode}
+                  inversionMode={inversionMode}
+                  restoreMode={restoreMode}
+                />
             </div>
 
             <div className="flex-1 min-w-0">
@@ -312,12 +366,14 @@ export default function OfflineGame() {
                  currentPlayer={currentPlayer}
                  allowedColumn={allowedColumn}
                  onCellClick={(row, col) => handleCellClick('right', row, col)}
-                 playerName="4-6"
-                 isActive={rightBoardActive || stealMode || clearMode}
-                 diceStart={4}
-                 stealMode={stealMode}
-                 clearMode={clearMode}
-               />
+                  playerName="4-6"
+                  isActive={rightBoardActive || stealMode || clearMode || inversionMode || restoreMode}
+                  diceStart={4}
+                  stealMode={stealMode}
+                  clearMode={clearMode}
+                  inversionMode={inversionMode}
+                  restoreMode={restoreMode}
+                />
             </div>
           </div>
 
@@ -349,25 +405,33 @@ export default function OfflineGame() {
                      </>
                    )}
                  </p>
-                 {!stealMode && !clearMode && (
-                   <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 mt-1">
-                     {isRolling
-                       ? 'Sorteando...'
-                       : allowedColumn !== null
-                       ? `Marque na coluna ${(allowedColumn % 3) + 1}`
-                       : 'Clique no dado para sortear!'}
-                   </p>
-                 )}
-              </div>
+                  {stealMode ? (
+                    <p className="text-xs md:text-sm text-purple-600 dark:text-purple-400 mt-1">
+                      🔒 Modo Roubo: Clique em uma casa do oponente!
+                    </p>
+                  ) : clearMode ? (
+                    <p className="text-xs md:text-sm text-red-600 dark:text-red-400 mt-1">
+                      🧹 Modo Limpar: Clique em qualquer casa para limpar!
+                    </p>
+                  ) : inversionMode ? (
+                    <p className="text-xs md:text-sm text-purple-600 dark:text-purple-400 mt-1">
+                      🔄 Modo Inverter: Clique em um tabuleiro para inverter!
+                    </p>
+                  ) : restoreMode ? (
+                    <p className="text-xs md:text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+                      ♻️ Modo Restaurar: Clique em um tabuleiro para restaurar!
+                    </p>
+                  ) : (
+               </div>
 
-              <div className="flex items-center gap-4">
+               <div className="flex items-center gap-4">
                  <Dice
-                   value={diceValue}
-                   size="lg"
-                   isRolling={isRolling}
-                   onClick={rollDice}
-                   disabled={isRolling || allowedColumn !== null || stealMode || clearMode}
-                 />
+                    value={diceValue}
+                    size="lg"
+                    isRolling={isRolling}
+                    onClick={rollDice}
+                    disabled={isRolling || allowedColumn !== null || stealMode || clearMode || inversionMode || restoreMode}
+                  />
                 <div className="text-center">
                   <p className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
                     {diceValue}
