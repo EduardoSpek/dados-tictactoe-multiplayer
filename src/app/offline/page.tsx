@@ -141,7 +141,7 @@ export default function OfflineGame() {
             setAllowedColumn(null)
             playSteal()
           } else {
-          const column = finalValue - 1
+            const column = finalValue - 1
           const boardSide = column <= 2 ? 'left' : 'right'
           const colIndex = column <= 2 ? column : column - 3
           const board = boardSide === 'left' ? boardLeft : boardRight
@@ -175,20 +175,20 @@ export default function OfflineGame() {
     const setBoard = boardSide === 'left' ? setBoardLeft : setBoardRight
     const cellValue = board[row][col]
 
-     // Clear mode
-     if (clearMode) {
-       const boardToClear = boardSide === 'left' ? 'left' : 'right'
-       const newBoard = Array(3).fill(null).map(() => Array(3).fill(null))
-       setBoard(newBoard)
-       
-       playSteal()
-       setClearMode(false)
-       setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
-       return
-     }
-     
-      // Steal mode
-      if (stealMode) {
+    // Clear mode
+    if (clearMode) {
+      const boardToClear = boardSide === 'left' ? 'left' : 'right'
+      const newBoard = Array(3).fill(null).map(() => Array(3).fill(null))
+      setBoard(newBoard)
+
+      playSteal()
+      setClearMode(false)
+      setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
+      return
+    }
+
+    // Steal mode
+    if (stealMode) {
        const opponent = currentPlayer === 'X' ? 'O' : 'X'
        if (cellValue !== opponent) return
 
