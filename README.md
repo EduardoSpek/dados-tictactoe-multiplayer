@@ -31,12 +31,15 @@ Um jogo da velha inovador com mecânicas de dados, dois tabuleiros simultâneos 
 - **😀 Reações com Emoji**: Comunique-se com oponente usando emojis (feliz, triste, raiva, risada, descolado)
 - **⏱️ Timer de Turno**: 15 segundos para jogar, caso expire a vez passa automaticamente
 - **🔊 Som de Turno Perdido**: Alerta sonoro quando o timer expira e a vez passa
+- **⚡ Modo Tempo Attack**: Jogue contra o relógio! Cada jogador tem tempo limitado para fazer suas jogadas
 
 ### 💰 Sistema de Moedas e Compras
 - **🪙 Ganhe Moedas**: Receba 1 moeda ao vencer uma rodada
 - **💎 Sequência de Vitórias**: Acumule bônus com vitórias consecutivas (streak)
 - **🛒 Compre Modos Especiais**: Use moedas para ativar poderes:
+  - **Roubar (1 moeda)**: Ative o modo roubo e capture casas do adversário
   - **Limpar Tabuleiro (1 moeda)**: Limpe todas as casas do oponente em um tabuleiro
+  - **Inverter (1 moeda)**: Inverte todas as marcas do tabuleiro (X vira O)
   - **Restaurar Tabuleiro (2 moedas)**: Restaure o tabuleiro que foi limpo pelo oponente
 - **🔄 Cancelar Compra**: Cancele um modo comprado antes de usar
 
