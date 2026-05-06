@@ -3,6 +3,8 @@ import { NextRequest } from 'next/server'
 import { Server as SocketIOServer } from 'socket.io'
 import { v4 as uuidv4 } from 'uuid'
 
+export const dynamic = 'force-dynamic'
+
 // Store for active games
 const games: Map<string, GameRoom> = new Map()
 
@@ -18,6 +20,8 @@ interface GameRoom {
   winner: string | null
   stealMode: boolean
   gameStarted: boolean
+  coins: { playerX: number; playerO: number }
+  winStreak: { playerX: number; playerO: number }
 }
 
 interface Player {
@@ -66,6 +70,8 @@ export async function GET(req: NextRequest) {
         winner: null,
         stealMode: false,
         gameStarted: false,
+        coins: { playerX: 0, playerO: 0 },
+        winStreak: { playerX: 0, playerO: 0 },
       }
       
       games.set(roomId, game)
