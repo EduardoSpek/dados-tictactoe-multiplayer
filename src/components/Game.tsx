@@ -8,6 +8,8 @@ import useSound from '@/hooks/useSound'
 interface Score {
   playerX: number
   playerO: number
+  playerXStreak: number
+  playerOStreak: number
 }
 
 export default function Game() {
@@ -19,7 +21,7 @@ export default function Game() {
   const [isRolling, setIsRolling] = useState(false)
   const [allowedColumn, setAllowedColumn] = useState<number | null>(null)
   const [winner, setWinner] = useState<string | null>(null)
-  const [score, setScore] = useState<Score>({ playerX: 0, playerO: 0 })
+  const [score, setScore] = useState<Score>({ playerX: 0, playerO: 0, playerXStreak: 0, playerOStreak: 0 })
   const [gameStarted, setGameStarted] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [stealMode, setStealMode] = useState(false)
@@ -29,7 +31,13 @@ export default function Game() {
     setMounted(true)
     const savedScore = localStorage.getItem('dadosTictactoeScore')
     if (savedScore) {
-      setScore(JSON.parse(savedScore))
+      const parsed = JSON.parse(savedScore)
+      setScore({
+        playerX: parsed.playerX || 0,
+        playerO: parsed.playerO || 0,
+        playerXStreak: parsed.playerXStreak || 0,
+        playerOStreak: parsed.playerOStreak || 0,
+      })
     }
   }, [])
 
@@ -208,7 +216,11 @@ export default function Game() {
         newBoard[row] = [...newBoard[row]]
         newBoard[row][col] = currentPlayer
 
-        if (boardSide === 'left') setBoardLeft(newBoard) else setBoardRight(newBoard)
+        if (boardSide === 'left') {
+          setBoardLeft(newBoard)
+        } else {
+          setBoardRight(newBoard)
+        }
 
         setStealMode(false)
         setAllowedColumn(null)
@@ -216,61 +228,44 @@ export default function Game() {
         return
       }
     } else if (allowedColumn !== null) {
-      const column = allowedColumn
-      const boardSide = column <= 2 ? 'left' : 'right'
-      const colIndex = column <= 2 ? column : column - 3
+      // Normal mode - need allowedColumn
+      const actualCol = boardSide === 'left' ? col : col + 3
+      if (actualCol !== allowedColumn) return
 
-      if (boardSide === (boardSide === 'left' ? 'left' : 'right') && colIndex === col && boardSide === (boardSide === 'left' ? 'left' : 'right')) {
-        // This logic is a bit redundant in the original, but let's keep it simple
-      }
-    }
+      if (cellValue !== null) return
 
-    // The original handleCellClick had some complex logic for allowedColumn.
-    // I will keep the original logic for the rest of the function to avoid breaking it.
-    // Since I only have a partial read, I'll use a more precise edit.
-  }eal opponent's cells
-      if (cellValue !== opponent) {
-        console.log('Cannot steal - not opponent cell')
-        return
-      }
-      
-      // Create new board with stolen cell
-      const newBoard = currentBoard.map((r, rowIndex) => 
-        r.map((cell, colIndex) => {
-          if (rowIndex === row && colIndex === col) {
-            return currentPlayer // Replace with current player's mark
-          }
-          return cell
-        })
-      )
-      
-      console.log('New board after steal:', newBoard)
-      
-      playSteal()
-      
-      // Update the correct board state
+      const newBoard = currentBoard.map(r => [...r])
+      newBoard[row][col] = currentPlayer
+      playPlaceMark()
+
       if (boardSide === 'left') {
         setBoardLeft(newBoard)
       } else {
         setBoardRight(newBoard)
       }
-      
-      // Check for winner after state update
+
       if (checkWinner(newBoard, currentPlayer)) {
         playWin()
         setWinner(currentPlayer)
-        setScore(prev => ({
-          ...prev,
-          [currentPlayer === 'X' ? 'playerX' : 'playerO']: prev[currentPlayer === 'X' ? 'playerX' : 'playerO'] + 1
-        }))
+        const playerKey = currentPlayer === 'X' ? 'playerX' : 'playerO'
+        const streakKey = currentPlayer === 'X' ? 'playerXStreak' : 'playerOStreak'
+        const opponentStreakKey = currentPlayer === 'X' ? 'playerOStreak' : 'playerXStreak'
+        setScore(prev => {
+          const newStreak = prev[streakKey] + 1
+          const coinsToAdd = newStreak % 2 === 0 ? 1 : 0
+          return {
+            ...prev,
+            [playerKey]: prev[playerKey] + coinsToAdd,
+            [streakKey]: newStreak,
+            [opponentStreakKey]: 0, // Reset opponent streak
+          }
+        })
       } else {
-        setCurrentPlayer(prev => prev === 'X' ? 'O' : 'X')
-        setStealMode(false)
+        setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
+        setAllowedColumn(null)
       }
       return
     }
-    
-    // Normal mode - need allowedColumn
     if (allowedColumn === null) return
     
     const actualCol = boardSide === 'left' ? col : col + 3
@@ -291,10 +286,19 @@ export default function Game() {
     if (checkWinner(newBoard, currentPlayer)) {
       playWin()
       setWinner(currentPlayer)
-      setScore(prev => ({
-        ...prev,
-        [currentPlayer === 'X' ? 'playerX' : 'playerO']: prev[currentPlayer === 'X' ? 'playerX' : 'playerO'] + 1
-      }))
+      const playerKey = currentPlayer === 'X' ? 'playerX' : 'playerO'
+      const streakKey = currentPlayer === 'X' ? 'playerXStreak' : 'playerOStreak'
+      const opponentStreakKey = currentPlayer === 'X' ? 'playerOStreak' : 'playerXStreak'
+      setScore(prev => {
+        const newStreak = prev[streakKey] + 1
+        const coinsToAdd = newStreak % 2 === 0 ? 1 : 0
+        return {
+          ...prev,
+          [playerKey]: prev[playerKey] + coinsToAdd,
+          [streakKey]: newStreak,
+          [opponentStreakKey]: 0, // Reset opponent streak
+        }
+      })
     } else {
       setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X')
       setAllowedColumn(null)
@@ -313,7 +317,7 @@ export default function Game() {
   }
 
   const resetScore = () => {
-    setScore({ playerX: 0, playerO: 0 })
+    setScore({ playerX: 0, playerO: 0, playerXStreak: 0, playerOStreak: 0 })
     localStorage.removeItem('dadosTictactoeScore')
   }
 

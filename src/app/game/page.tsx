@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useSocket } from '@/hooks/useSocket'
 import useSound from '@/hooks/useSound'
@@ -9,7 +9,7 @@ import Dice from '@/components/Dice'
 import ReactionButton, { ReactionButtonRef } from '@/components/ReactionButton'
 import confetti from 'canvas-confetti'
 
-export default function GamePage() {
+function GameContent() {
   const searchParams = useSearchParams()
   const roomId = searchParams.get('room')
   const {
@@ -655,13 +655,6 @@ export default function GamePage() {
                         🎭 Inverter
                       </button>
                       <button
-                        onClick={() => { buyMode('time'); document.getElementById('buy-menu')?.classList.add('hidden'); }}
-                        disabled={gameState.isRolling || (playerSymbol === 'X' ? gameState.coins.playerX : gameState.coins.playerO) < 1}
-                        className="w-full px-3 py-2 mb-1 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white text-sm font-bold rounded-lg transition-colors"
-                      >
-                        ⏱️ Tempo (1🪙)
-                      </button>
-                      <button
                         onClick={() => { buyMode('restore'); document.getElementById('buy-menu')?.classList.add('hidden'); }}
                         disabled={gameState.isRolling || (playerSymbol === 'X' ? gameState.coins.playerX : gameState.coins.playerO) < 2}
                         className="w-full px-3 py-2 mt-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white text-sm font-bold rounded-lg transition-colors"
@@ -786,5 +779,13 @@ export default function GamePage() {
         }
       `}</style>
     </div>
+  )
+}
+
+export default function GamePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Carregando...</div>}>
+      <GameContent />
+    </Suspense>
   )
 }

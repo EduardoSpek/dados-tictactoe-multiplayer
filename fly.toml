@@ -1,0 +1,11 @@
+app = "dados-tictactoe-multiplayer"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http]
+  port = 3000
+
+[[services]]
+  protocol = "tcp"
+  ports = [{ port = 3000 }]

@@ -96,6 +96,7 @@ export function useSocket() {
     clearMode: false,
     inversionMode: false,
     restoreMode: false,
+    timeAttackMode: false,
     gameStarted: false,
     score: { playerX: 0, playerO: 0 },
     coins: { playerX: 0, playerO: 0 },
@@ -210,6 +211,7 @@ export function useSocket() {
       clearMode?: boolean
       inversionMode?: boolean
       restoreMode?: boolean
+      timeAttackMode?: boolean
     }) => {
       console.log('Sync game state:', data)
       setGameState(prev => ({
@@ -241,6 +243,7 @@ export function useSocket() {
       clearMode?: boolean
       inversionMode?: boolean
       restoreMode?: boolean
+      timeAttackMode?: boolean
       columnFull?: boolean
     }) => {
       setGameState(prev => ({
@@ -411,6 +414,11 @@ export function useSocket() {
       }))
     })
 
+    socket.on('player-temporarily-disconnected', () => {
+      // Show temporary message - don't end game yet, give player time to reconnect
+      setError('Oponente temporariamente desconectado...')
+    })
+
     socket.on('player-left', () => {
       setError('Oponente desconectou')
     })
@@ -434,7 +442,7 @@ export function useSocket() {
         currentPlayer: data.newCurrentPlayer,
         turnTimeLeft: 15,
         allowedColumn: null,
-        diceValue: null,
+        diceValue: prev.diceValue,
         stealMode: false,
         clearMode: false,
         inversionMode: false,

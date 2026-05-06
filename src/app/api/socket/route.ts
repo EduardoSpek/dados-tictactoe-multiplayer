@@ -25,6 +25,7 @@ interface Player {
   socketId: string
   symbol: 'X' | 'O'
   name: string
+  disconnectedAt?: number
 }
 
 export async function GET(req: NextRequest) {
@@ -340,6 +341,7 @@ export async function GET(req: NextRequest) {
         boardLeft: game.boardLeft,
         boardRight: game.boardRight,
         currentPlayer: game.currentPlayer,
+        coins: game.coins,
       })
     })
 
@@ -348,12 +350,13 @@ export async function GET(req: NextRequest) {
       console.log('Player disconnected:', socket.id)
 
       // Find the player's room first
-      let playerRoom = null
-      games.forEach((game, roomId) => {
+      let playerRoom: { roomId: string; game: GameRoom } | null = null
+      for (const [roomId, game] of Array.from(games.entries())) {
         if (game.players.has(socket.id)) {
           playerRoom = { roomId, game }
+          break
         }
-      })
+      }
 
       if (!playerRoom) return
 
@@ -369,9 +372,10 @@ export async function GET(req: NextRequest) {
 
         // After 5 seconds, if player hasn't reconnected, remove them
         setTimeout(() => {
+          // Check if player is still in the game AND still marked as disconnected
           const currentPlayer = game.players.get(socket.id)
           if (currentPlayer && currentPlayer.disconnectedAt) {
-            // Player didn't reconnect - actually remove them
+            // Player didn't reconnect within 5 seconds - actually remove them
             game.players.delete(socket.id)
             io.to(roomId).emit('player-left', { playerId: socket.id })
 

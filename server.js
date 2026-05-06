@@ -337,6 +337,9 @@ app.prepare().then(() => {
         winner: game.winner,
         stealMode: game.stealMode,
         clearMode: game.clearMode || false,
+        inversionMode: game.inversionMode || false,
+        restoreMode: game.restoreMode || false,
+        timeAttackMode: game.timeAttackMode || false,
       })
       console.log(`[JOIN] Sent sync-game-state to ${data.playerName}`)
 
@@ -482,9 +485,12 @@ app.prepare().then(() => {
           winner: game.winner,
           stealMode: game.stealMode,
           clearMode: game.clearMode || false,
+          inversionMode: game.inversionMode || false,
+          restoreMode: game.restoreMode || false,
+          timeAttackMode: game.timeAttackMode || false,
         })
       }
-      
+
       console.log(`[CREATOR] Rejoined room ${roomId}, players: ${players.length}`)
     })
 
@@ -554,9 +560,12 @@ app.prepare().then(() => {
           winner: game.winner,
           stealMode: game.stealMode,
           clearMode: game.clearMode || false,
+          inversionMode: game.inversionMode || false,
+          restoreMode: game.restoreMode || false,
+          timeAttackMode: game.timeAttackMode || false,
         })
       }
-      
+
       console.log(`[REJOIN] Player ${disconnectedPlayer.name} rejoined room ${roomId}`)
     })
 
@@ -986,16 +995,19 @@ app.prepare().then(() => {
             game.score.playerO++
           }
 
-          // Award coin on every win
-          if (game.currentPlayer === 'X') {
-            game.coins.playerX++
-            console.log(`[COIN] Player X earned a coin! Total: ${game.coins.playerX}`)
-          } else {
-            game.coins.playerO++
-            console.log(`[COIN] Player O earned a coin! Total: ${game.coins.playerO}`)
+          // Award coin every 2 consecutive wins
+          const winnerKey = game.currentPlayer === 'X' ? 'playerX' : 'playerO'
+          const opponentKey = game.currentPlayer === 'X' ? 'playerO' : 'playerX'
+          game.winStreak[winnerKey]++
+          game.winStreak[opponentKey] = 0 // Reset opponent streak
+
+          if (game.winStreak[winnerKey] === 2) {
+            game.coins[winnerKey]++
+            game.winStreak[winnerKey] = 0 // Reset streak after awarding coin
+            console.log(`[COIN] Player ${game.currentPlayer} earned a coin! Total: ${game.coins[winnerKey]}`)
           }
 
-          console.log(`[WIN] Player ${game.currentPlayer} won! Score: X=${game.score.playerX} O=${game.score.playerO}, Coins: X=${game.coins.playerX} O=${game.coins.playerO}`)
+          console.log(`[WIN] Player ${game.currentPlayer} won! Score: X=${game.score.playerX} O=${game.score.playerO}, Coins: X=${game.coins.playerX} O=${game.coins.playerO}, Streak: X=${game.winStreak.playerX} O=${game.winStreak.playerO}`)
         } else {
           game.currentPlayer = game.currentPlayer === 'X' ? 'O' : 'X'
           game.stealMode = false
@@ -1048,16 +1060,19 @@ app.prepare().then(() => {
           game.score.playerO++
         }
 
-        // Award coin on every win
-        if (game.currentPlayer === 'X') {
-          game.coins.playerX++
-          console.log(`[COIN] Player X earned a coin! Total: ${game.coins.playerX}`)
-        } else {
-          game.coins.playerO++
-          console.log(`[COIN] Player O earned a coin! Total: ${game.coins.playerO}`)
+        // Award coin every 2 consecutive wins
+        const winnerKey = game.currentPlayer === 'X' ? 'playerX' : 'playerO'
+        const opponentKey = game.currentPlayer === 'X' ? 'playerO' : 'playerX'
+        game.winStreak[winnerKey]++
+        game.winStreak[opponentKey] = 0 // Reset opponent streak
+
+        if (game.winStreak[winnerKey] === 2) {
+          game.coins[winnerKey]++
+          game.winStreak[winnerKey] = 0 // Reset streak after awarding coin
+          console.log(`[COIN] Player ${game.currentPlayer} earned a coin! Total: ${game.coins[winnerKey]}`)
         }
 
-        console.log(`[WIN] Player ${game.currentPlayer} won! Score: X=${game.score.playerX} O=${game.score.playerO}, Coins: X=${game.coins.playerX} O=${game.coins.playerO}`)
+        console.log(`[WIN] Player ${game.currentPlayer} won! Score: X=${game.score.playerX} O=${game.score.playerO}, Coins: X=${game.coins.playerX} O=${game.coins.playerO}, Streak: X=${game.winStreak.playerX} O=${game.winStreak.playerO}`)
       } else {
         game.currentPlayer = game.currentPlayer === 'X' ? 'O' : 'X'
         game.allowedColumn = null
@@ -1217,7 +1232,7 @@ app.prepare().then(() => {
       game.winner = null
       game.stealMode = false
       game.isRolling = false
-      
+
       io.to(roomId.toUpperCase()).emit('game-reset', {
         boardLeft: game.boardLeft,
         boardRight: game.boardRight,
