@@ -3,7 +3,7 @@ services:
     name: dados-tictactoe
     env: node
     region: oregon
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && npx next build
     startCommand: npm run start
     envVars:
       - key: NODE_ENV
