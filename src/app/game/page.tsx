@@ -207,19 +207,19 @@ function GameContent() {
     playWin()
     
     // Trigger confetti animation
-    const duration = 3000
+    const duration = 1500
     const end = Date.now() + duration
 
     const frame = () => {
       confetti({
-        particleCount: 5,
+        particleCount: 2,
         angle: 60,
         spread: 55,
         origin: { x: 0 },
         colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
       })
       confetti({
-        particleCount: 5,
+        particleCount: 2,
         angle: 120,
         spread: 55,
         origin: { x: 1 },
