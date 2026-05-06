@@ -5,8 +5,8 @@ const { Server } = require('socket.io')
 const { v4: uuidv4 } = require('uuid')
 
 const dev = process.env.NODE_ENV !== 'production'
-const hostname = 'localhost'  // Next.js precisa de localhost
-const port = 3001
+const hostname = dev ? 'localhost' : '0.0.0.0'
+const port = process.env.PORT || 3001
 
 const app = next({ dev, hostname, port })
 const handle = app.getRequestHandler()
