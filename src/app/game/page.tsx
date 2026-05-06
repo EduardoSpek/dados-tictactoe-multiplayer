@@ -317,7 +317,7 @@ export default function GamePage() {
   }
 
   const isMyTurn = playerSymbol === gameState.currentPlayer
-  const canRoll = gameState.gameStarted && isMyTurn && !gameState.isRolling && !gameState.winner && !gameState.stealMode && !gameState.clearMode && !gameState.restoreMode
+  const canRoll = gameState.gameStarted && isMyTurn && !gameState.isRolling && !gameState.winner && !gameState.stealMode && !gameState.clearMode && !gameState.inversionMode && !gameState.restoreMode
   console.log('[Game] ★ canRoll:', canRoll, 'gameStarted:', gameState.gameStarted, 'isMyTurn:', isMyTurn, 'isRolling:', gameState.isRolling, 'winner:', gameState.winner, 'playerSymbol:', playerSymbol, 'currentPlayer:', gameState.currentPlayer, 'stealMode:', gameState.stealMode, 'clearMode:', gameState.clearMode)
 
   // Debug: Log when dice is clicked
